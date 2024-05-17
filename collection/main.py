@@ -11,7 +11,7 @@ def request_id(id: str):
         j = json.loads(response.read().decode('utf-8'))
 
         # write the data to a jsonl file
-        with open(f"collection/data/{id}.city.jsonl", "w") as my_file:
+        with open(f"collection/input/{id}.city.jsonl", "w") as my_file:
             my_file.write(json.dumps(j["metadata"]) + "\n")
             if "feature" in j:
                 my_file.write(json.dumps(j["feature"]) + "\n")
