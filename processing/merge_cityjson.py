@@ -27,7 +27,7 @@ class MergeCityJSON:
         all_objects = []
         for file in os.listdir(self.input_folder):
             if 'merged' in file:
-                print('Merged file found, should not be in the input folder. Skipping...')
+                print('WARNING: Merged file found, should not be in the input folder. Skipping...')
                 continue
             elif file.endswith('city.json') or file.endswith('city.jsonl'):
                 cm = CityJSON(open(f"{self.input_folder}/{file}", 'r'))
@@ -57,19 +57,11 @@ class MergeCityJSON:
         with open(f"{self.output_folder}/{self.file_name}", 'w') as f:
             json.dump(self.merged_obj, f)
 
-# def rename_files(input_folder):
-#     # rename files to the correct format
-#     for file in os.listdir(input_folder):
-#         if not file.endswith('city.json') and file.endswith('.json'):
-#             os.rename('input/' + file, 'input/' + file[:-5] + '.city.json')
-
 
     def run(self):
         # load & merge
         self.load_objects()
         self.merge_objects()
-        print(len(self.merged_obj))
-        print(len(self.all_objects))
         
         # save the merged object
         self.create_output_name()
