@@ -1,8 +1,10 @@
 import json
 import os
 
-
-from processing.merge_cityjson import MergeCityJSON
+try:
+    from processing.merge_cityjson import MergeCityJSON
+except:
+    from merge_cityjson import MergeCityJSON
 
 
 class processing():
@@ -19,6 +21,13 @@ class processing():
         self.input_file = merger.file_path
 
     def add_metrics(self):
+        self.input_file
+        n_processors = os.cpu_count() - 2
+        if os.getcwd().endswith('processing'):
+            os.chdir('..')
+        print(self.input_file)
+        command = f'python processing/metrics/cityStats.py "{self.input_file}" -j {n_processors}'
+        os.system(command)
         pass
 
     def main(self):
@@ -29,7 +38,7 @@ class processing():
         # self.initate_gpkg()
 
         # calculate the 2d / 3d metrics and add them to the gpkg
-        # self.add_metrics()
+        self.add_metrics()
 
         # TODO: add the results from the turning function
 
@@ -39,6 +48,6 @@ class processing():
 if __name__ == '__main__':
     
     # p = processing(input_file=r"C:\Users\TimoScheidel\OneDrive - HAN\Future Factory\data\output/merged (3).city.json")
-    p = processing("collection/input", convert=False)
+    p = processing("collection/input")
     p.main()
     p.input_file
