@@ -6,12 +6,11 @@ import similarity_calculation
 if __name__ == '__main__':
     # Get the data from the collection
     all_ids = ["NL.IMBAG.Pand.0202100000238878", "NL.IMBAG.Pand.0202100000206918"]
-    data = collection.main(all_ids)
-    print(data)
+    collection.main(all_ids)
 
     # Process the data
     p = processing("collection/input")
-    data = p.main()
+    p.run()
 
     # # Calculate the similarity between the data
     # similarity = similarity_calculation.calculate_similarity(data)

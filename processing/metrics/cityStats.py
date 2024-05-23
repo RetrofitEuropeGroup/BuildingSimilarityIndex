@@ -292,7 +292,7 @@ def get_neighbours(cm, obj, r, verts):
 def save_filter_stats(outfiltered_2d, outfiltered_3d, output):
 
     output_folder = output.split("/")[0]
-    logger = f"{output_folder}/filtered_buildings.csv"
+    logger = f"{output_folder}/filtered_buildings.csv" #TODO: does not come in the output folder
     tile_num = output.split("/")[-1].split(".")[0]
 
     # update the logger
@@ -340,7 +340,7 @@ def clean_df(df, output):
     # filter out the irrelevant columns
 
     irrelevant_columns = ["type", "lod", "errors", "valid", "orientation_values", "orientation_edges",
-                          "hole_count", "geometry", 'min_vertical_elongation', 'max_vertical_elongation']
+                          "hole_count", 'min_vertical_elongation', 'max_vertical_elongation']
     for col in irrelevant_columns:
         if col in clean.columns:
             clean = clean.drop(columns=col)
@@ -379,17 +379,6 @@ class StatValuesBuilder:
             self.__values[index_name] = index_func()
         else:
             self.__values[index_name] = "NC"
-
-def save_to_db(df, table_name):
-    # insert data
-    user = os.getenv('POSTGRES_USER')
-    password = os.getenv('POSTGRES_PASSWORD')
-    host = os.getenv('POSTGRES_HOST')
-    database = os.getenv('POSTGRES_DB')
-    engine = create_engine(f"postgresql://{user}:{password}@{host}/{database}")
-
-    df.reset_index(inplace=True)
-    df.to_sql(table_name, engine, if_exists='append', index=False)
 
 def process_building(building,
                      obj,
@@ -533,7 +522,7 @@ def process_building(building,
         # "errors": str(errors),
         # "valid": len(errors) == 0,
         "hole_count": tri_mesh.n_open_edges,
-        # "geometry": shape,
+        "geometry": shape,
         # "actual_convex_volume_ratio": fixed.volume / ch_volume
     }
 
@@ -614,9 +603,7 @@ def process_building(building,
 # Assume semantic surfaces
 @click.command()
 @click.argument("input", type=click.File("rb"))
-@click.option('-o', '--output', type=click.File("wb"))
-@click.option('-g', '--gpkg')
-@click.option('-v', '--val3dity-report', type=click.File("rb"))
+@click.option('-o', '--output')
 @click.option('-f', '--filter')
 @click.option('-r', '--repair', flag_value=True)
 @click.option('-p', '--plot-buildings', flag_value=True)
@@ -626,11 +613,8 @@ def process_building(building,
 @click.option('-j', '--jobs', default=1)
 @click.option('--density-2d', default=1.0)
 @click.option('--density-3d', default=1.0)
-@click.option('--database')
 def main(input,
          output,
-         gpkg,
-         val3dity_report,
          filter,
          repair,
          plot_buildings,
@@ -639,26 +623,26 @@ def main(input,
          break_on_error,
          jobs,
          density_2d,
-         density_3d,
-         database):
+         density_3d):
 
     cm = json.load(input)
 
-    if output is None: # if no output file is provided, use the name of the input file
+    # if no output file is provided, use the name of the input file. But in the output folder
+    if output is None: 
         output = input.name[:-5] + ".csv"
         output = output.replace('input', 'output')
 
-    if val3dity_report is None:
-        # force val3dity report generation if it doesn't exist, otherwise use the existing one
-        val3dity_report = f"{input.name[:-5]}_report.json"
-        if 'processing' in os.getcwd():
-            val3dity_cmd_location = os.path.join(os.getcwd(), 'metrics/val3dity/val3dity')
-        else:
-            val3dity_cmd_location = os.path.join(os.getcwd(), 'processing/metrics/val3dity/val3dity')
+    # create the val3dity report with the same name as the input file
+    val3dity_report = f"{input.name[:-5]}_report.json"
+    # determine the location of the val3dity command
+    if 'processing' in os.getcwd():
+        val3dity_cmd_location = os.path.join(os.getcwd(), 'metrics/val3dity/val3dity')
+    else:
+        val3dity_cmd_location = os.path.join(os.getcwd(), 'processing/metrics/val3dity/val3dity')
 
-        # create and open the report
-        subprocess.check_output(f'{val3dity_cmd_location} "{input.name}" -r "{val3dity_report}"')
-        val3dity_report = open(val3dity_report, "rb")
+    # create and open the report
+    subprocess.check_output(f'{val3dity_cmd_location} "{input.name}" -r "{val3dity_report}"')
+    val3dity_report = open(val3dity_report, "rb")
 
 
     if "transform" in cm:
@@ -759,21 +743,18 @@ def main(input,
 
     clean = clean_df(df, output)
     try:
-        if database:
-            save_to_db(df, database) # todo: change database to table_name
-        elif output.endswith(".csv"):
+        if output.endswith(".csv"):
             clean.to_csv(output)
+        elif output.endswith('.gpkg'):
+            gdf = geopandas.GeoDataFrame(clean, geometry="geometry")
+            gdf.to_file(f"{output}", driver="GPKG")
         else:
             clean.to_excel(output)
-    except:
-        print("Error saving the file")
+    except Exception as e:
+        print(f"ERROR: could not save the file: {e}")
         clean.to_csv("emergency.csv")
 
-    if not gpkg is None:
-        gdf = geopandas.GeoDataFrame(clean, geometry="geometry")
-        gdf.to_file(clean, driver="GPKG")
-    
-    if os.path.exists('val3dity.log'):
+    if os.path.exists('val3dity.log'): # clean the mess
         os.remove('val3dity.log')
 
 if __name__ == "__main__":
