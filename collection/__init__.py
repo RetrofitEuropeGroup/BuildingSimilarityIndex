@@ -1,1 +1,1 @@
-from .main import get_data
+from .main import *
