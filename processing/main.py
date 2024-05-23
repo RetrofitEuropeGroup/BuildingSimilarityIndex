@@ -1,25 +1,19 @@
-import geopandas as gpkg
+import json
+import os
 
-from merge_cityjson import MergeCityJSON
+
+from processing.merge_cityjson import MergeCityJSON
 
 
 class processing():
-    def __init__(self, input_folder: str = None, input_file: str = None, convert:bool = False):
+    def __init__(self, input_folder: str = None, input_file: str = None):
         if input_folder is not None and input_file is not None:
             raise ValueError("It is not possible to use both input_folder and input_file")
         
-        self.convert = convert
         self.input_folder = input_folder
         self.input_file = input_file
-        self.merge = True
 
-    def convert_files(self):
-        # TODO: implement
-        # convert the .json files to .city.jsonl files
-        # return the path to the folder containing the .city.jsonl files
-        pass
-
-    def get_input(self):
+    def merge_files(self):
         merger = MergeCityJSON(self.input_folder)
         merger.run()
         self.input_file = merger.file_path
@@ -28,17 +22,14 @@ class processing():
         pass
 
     def main(self):
-        if self.convert:
-            self.convert_files()
-
-        # merge if needed
+        # merge if not a single file has been provided
         if self.input_folder is not None:
-            self.get_input()
+            self.merge_files()
 
         # self.initate_gpkg()
 
         # calculate the 2d / 3d metrics and add them to the gpkg
-        self.add_metrics()
+        # self.add_metrics()
 
         # TODO: add the results from the turning function
 
@@ -47,5 +38,7 @@ class processing():
 
 if __name__ == '__main__':
     
-    p = processing(input_file=r"output/merged (3).city.json")
+    # p = processing(input_file=r"C:\Users\TimoScheidel\OneDrive - HAN\Future Factory\data\output/merged (3).city.json")
+    p = processing("collection/input", convert=False)
     p.main()
+    p.input_file
