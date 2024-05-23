@@ -29,7 +29,7 @@ class MergeCityJSON:
             if 'merged' in file:
                 print('WARNING: Merged file found, should not be in the input folder. Skipping...')
                 continue
-            elif file.endswith('city.json') or file.endswith('city.jsonl'):
+            elif file.endswith('city.json'):
                 cm = CityJSON(open(f"{self.input_folder}/{file}", 'r'))
                 all_objects.append(cm)
         self.all_objects = all_objects
