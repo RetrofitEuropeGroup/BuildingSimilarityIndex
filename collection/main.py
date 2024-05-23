@@ -1,6 +1,8 @@
 import requests
 import json
 
+# TODO: make a class
+# TODO: empty input folder before running
 
 def request_id(id: str):
     """Uses the 3dbag API to request data for a specific id and writes it to a jsonl file."""
@@ -26,6 +28,7 @@ def save(cityjson: dict, id: str):
 
 def main(all_ids: list):
     # TODO: make this asynchronous
+    
     for id in all_ids:
         try:
             if id.startswith('NL.IMBAG.Pand.') == False:

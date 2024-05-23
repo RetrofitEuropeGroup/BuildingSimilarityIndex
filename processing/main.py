@@ -48,6 +48,8 @@ class processing():
 
 if __name__ == '__main__':
     
-    # p = processing(input_file=r"C:\Users\TimoScheidel\OneDrive - HAN\Future Factory\data\output/merged (3).city.json")
     p = processing("collection/input")
     p.run()
+    import geopandas as gpd
+    gdf = gpd.read_file(p.gpkg_path)
+    print(gdf)
