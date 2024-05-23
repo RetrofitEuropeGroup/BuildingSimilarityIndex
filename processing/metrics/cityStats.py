@@ -291,8 +291,10 @@ def get_neighbours(cm, obj, r, verts):
 
 def save_filter_stats(outfiltered_2d, outfiltered_3d, output):
 
-    output_folder = output.split("/")[0]
-    logger = f"{output_folder}/filtered_buildings.csv" #TODO: does not come in the output folder
+    output_folder_parts = output.split("/")[:-1]
+    output_folder = "/".join(output_folder_parts)
+
+    logger = f"{output_folder}/filtered_buildings.csv"
     tile_num = output.split("/")[-1].split(".")[0]
 
     # update the logger
