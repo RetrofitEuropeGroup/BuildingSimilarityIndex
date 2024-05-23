@@ -1,18 +1,20 @@
 import collection
-import processing
+from processing import processing
 import similarity_calculation
 
 
 if __name__ == '__main__':
     # Get the data from the collection
-    print(dir(collection))
-    data = collection.get_data()
+    all_ids = ["NL.IMBAG.Pand.0202100000238878", "NL.IMBAG.Pand.0202100000206918"]
+    data = collection.main(all_ids)
+    print(data)
 
     # Process the data
-    data = processing.process_data(data)
+    p = processing("collection/input")
+    data = p.main()
 
-    # Calculate the similarity between the data
-    similarity = similarity_calculation.calculate_similarity(data)
+    # # Calculate the similarity between the data
+    # similarity = similarity_calculation.calculate_similarity(data)
 
-    # Print the similarity
-    print(similarity.head())
+    # # Print the similarity
+    # print(similarity.head())

@@ -70,8 +70,6 @@ class MergeCityJSON:
         self.create_output_name()
         self.save()
 
-
 if __name__ == '__main__':
     merger = MergeCityJSON(r'input_folder', 'test_output')
     merger.run()
-    
