@@ -1,10 +1,12 @@
 import requests
 import json
+import os
 
-# TODO: make a class
-# TODO: empty input folder before running
 
 class collection():
+    def __init__(self, input_folder: str = "./collection/input"):
+        self.input_folder = input_folder
+
     def request_id(self, id: str):
         """Uses the 3dbag API to request data for a specific id and writes it to a jsonl file."""
         url = f"https://api.3dbag.nl/collections/pand/items/{id}"
@@ -24,11 +26,25 @@ class collection():
 
     def save(self, cityjson: dict, id: str):
         """Saves the CityJSON data to a file."""
-        with open(f'./collection/input/{id}.city.json', 'w') as file:
+        with open(f'{self.input_folder}/{id}.city.json', 'w') as file:
             json.dump(cityjson, file)
 
+    def check_input_folder(self):
+        """Checks if the input folder exists and is a folder, if not it will be created. If it exists and is not empty, a warning is printed."""
+        if not os.path.exists(self.input_folder):
+            os.makedirs(self.input_folder)
+        elif not os.path.isdir(self.input_folder):
+            raise ValueError("The input_folder should be a directory, not a file.")
+        elif len(os.listdir(self.input_folder)) > 1:
+            print("WARNING: the input folder is not empty, the data will be overwritten if it already exists")
+        elif len(os.listdir(self.input_folder)) == 1 and os.path.exists(f"{self.input_folder}/.gitkeep") == False:
+            print("WARNING: the input folder is not empty, the data will be overwritten if it already exists")
+        # else: the folder is empty, so no warning is needed
+
     def request_list(self, all_ids: list):
-        # TODO: make this asynchronous
+        """Requests and save the data in cityjson format for all the ids in the list."""
+
+        self.check_input_folder()
 
         for id in all_ids:
             try:
