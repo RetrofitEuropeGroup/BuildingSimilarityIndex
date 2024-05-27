@@ -2,7 +2,7 @@
 
 import numpy as np
 from shapely.geometry import Polygon, MultiPolygon
-from helpers.geometry import project_2d, surface_normal, triangulate, triangulate_polygon
+from helpers.geometry import triangulate_polygon
 import pyvista as pv
 
 def get_surface_boundaries(geom):
@@ -36,15 +36,15 @@ def to_shapely(geom, vertices, ground_only=True):
             values = semantics["values"]
         else:
             values = semantics["values"][0]
-        
+
         ground_idxs = [semantics["surfaces"][i]["type"] == "GroundSurface" for i in values]
 
         boundaries = np.array(boundaries, dtype=object)[ground_idxs]
-    
+
     shape = MultiPolygon([Polygon([vertices[v] for v in boundary[0]]) for boundary in boundaries])
 
     shape = shape.buffer(0)
-    
+
     return shape
 
 def to_polydata(geom, vertices):
@@ -57,29 +57,29 @@ def to_polydata(geom, vertices):
 
     mesh = pv.PolyData(vertices, faces, n_faces=len(boundaries))
 
-    if "semantics" in geom:        
+    if "semantics" in geom:
         semantics = geom["semantics"]
         if geom["type"] == "MultiSurface":
             values = semantics["values"]
         else:
             values = semantics["values"][0]
-        
+
         mesh.cell_data["semantics"] = [semantics["surfaces"][i]["type"] for i in values]
-    
+
     return mesh
 
 def to_triangulated_polydata(geom, vertices, clean=True):
     """Returns the polydata mesh from a CityJSON geometry"""
 
     boundaries = get_surface_boundaries(geom)
-    
-    if "semantics" in geom:        
+
+    if "semantics" in geom:
         semantics = geom["semantics"]
         if geom["type"] == "MultiSurface":
             values = semantics["values"]
         else:
             values = semantics["values"][0]
-        
+
         semantic_types = [semantics["surfaces"][i]["type"] for i in values]
 
     points = []
@@ -100,12 +100,12 @@ def to_triangulated_polydata(geom, vertices, clean=True):
 
         if "semantics" in geom:
             semantics.extend([semantic_types[fid] for _ in np.arange(t_count)])
-    
+
     mesh = pv.PolyData(points, triangles, n_faces=triangle_count)
 
     if "semantics" in geom:
         mesh["semantics"] = semantics
-    
+
     if clean:
         mesh = mesh.clean()
 

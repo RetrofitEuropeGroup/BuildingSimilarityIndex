@@ -14,7 +14,6 @@ import rtree.index
 import scipy.spatial as ss
 # from pymeshfix import MeshFix
 from tqdm import tqdm
-from sqlalchemy import create_engine
 
 import cityjson
 import geometry
@@ -630,7 +629,7 @@ def main(input,
     cm = json.load(input)
 
     # if no output file is provided, use the name of the input file. But in the output folder
-    if output is None: 
+    if output is None:
         output = input.name[:-5] + ".csv"
         output = output.replace('input', 'output')
 
