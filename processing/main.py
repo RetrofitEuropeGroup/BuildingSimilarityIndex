@@ -3,6 +3,7 @@ import sys
 
 # if we run the script from the processing folder, we need to add the parent folder to the path
 # otherwise it won't search for processing.merge_cityjson in the root folder of the repository
+# this is useful for testing
 parent_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_dir)
 from processing.merge_cityjson import MergeCityJSON
