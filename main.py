@@ -5,13 +5,13 @@ from similarity_calculation import similarity
 def run(all_ids: list):
     # Get the data from the collection
     c = collection()
-    c.request_list(all_ids)
+    c.collect_id_list(all_ids)
 
     # Process the data
     p = processing("collection/input")
     p.run()
 
-    # # Calculate the similarity between the data
+    # Calculate the similarity between the data
     s = similarity(p.gpkg_path, ["roughness_index_3d", "actual_volume"])
     dist = s.calculate_distance(all_ids[0], all_ids[1])
     print(f"distance between '{all_ids[0]}' and '{all_ids[1]}': {dist}")
