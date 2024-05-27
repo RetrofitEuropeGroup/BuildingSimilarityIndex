@@ -1,18 +1,19 @@
-import collection
+from collection import collection
 from processing import processing
 from similarity_calculation import similarity
 
 def run(all_ids: list):
     # Get the data from the collection
-    # collection.main(all_ids)
+    c = collection()
+    c.request_list(all_ids)
 
     # Process the data
     p = processing("collection/input")
     p.run()
 
     # # Calculate the similarity between the data
-    sim = similarity(p.gpkg_path, ["roughness_index_3d", "actual_volume"])
-    dist = sim.calculate_distance(all_ids[0], all_ids[1])
+    s = similarity(p.gpkg_path, ["roughness_index_3d", "actual_volume"])
+    dist = s.calculate_distance(all_ids[0], all_ids[1])
     print(f"distance between '{all_ids[0]}' and '{all_ids[1]}': {dist}")
 
 if __name__ == '__main__':
