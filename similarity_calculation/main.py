@@ -1,6 +1,8 @@
 import geopandas as gpd
 import numpy as np
+import matplotlib.pyplot as plt
 
+from tqdm import tqdm
 from sklearn.metrics.pairwise import euclidean_distances
 
 class similarity:
@@ -30,12 +32,18 @@ class similarity:
         else:
             return columns
     
-    ## main functions
     def normalize(self):
         """normalize the columns in the geopandas dataframe so that every feature has the same weight in the distance calculation"""
         self.prepared_gpdf = self.gpdf.copy()
+        
         for column in self.columns:
-            self.prepared_gpdf[column] = (self.gpdf[column] - self.gpdf[column].mean()) / self.gpdf[column].std()
+            if self.gpdf[column].dtype != "float64":
+                self.prepared_gpdf[column] = self.gpdf[column].astype(float)
+            try:
+                self.prepared_gpdf[column] = (self.prepared_gpdf[column] - self.prepared_gpdf[column].mean()) / self.prepared_gpdf[column].std()
+            except Exception as e:
+                raise ValueError(f"Could not normalize column: {column}. Error: {e}")
+
     
     def scale(self):
         """scale the columns in the geopandas dataframe according to the given weights, so that the features have different weights in the distance calculation"""
@@ -47,6 +55,7 @@ class similarity:
         if self.column_weights is not None:
             self.scale()
 
+    ## main functions
     def check_ids(self, id1, id2):
         # check if the ids are in the correct format
         if not id1.startswith("NL.IMBAG.Pand."):
@@ -84,8 +93,8 @@ class similarity:
     def mirror(self, matrix):
         upper_tri = np.triu(matrix)
         lower_tri = upper_tri.T
-        symmetric_matrix = upper_tri + lower_tri
-        return symmetric_matrix
+        mirrored_matrix = upper_tri + lower_tri
+        return mirrored_matrix
 
     def save(self, matrix, output_path, header):
         if matrix.shape[0] == matrix.shape[1]:
@@ -93,9 +102,23 @@ class similarity:
             matrix = self.mirror(matrix)
         
         np.savetxt(output_path, matrix, delimiter=",", fmt='%f', header=header, comments='')
+        return matrix
 
+    def plot(self, matrix, all_ids):
+        if matrix.shape[0] != matrix.shape[1]:
+            raise ValueError("Matrix is not square, cannot plot")
+        if matrix.shape[0] != len(all_ids):
+            raise ValueError("Number of ids does not match the matrix dimensions")
+        if len(all_ids) > 50:
+            raise ValueError("Too many ids to plot, max 50 ids allowed")
+        
+        plt.matplotlib.pyplot.matshow(matrix)
+        plt.xticks(range(len(all_ids)), all_ids, rotation=90)
+        plt.yticks(range(len(all_ids)), all_ids)
+        plt.colorbar()
+        plt.show()
 
-    def distance_matrix(self, output_path: str = None, save_interval: int = 100):
+    def distance_matrix(self, output_path: str = None, save_interval: int = 100, plot: bool = False):
         if isinstance(output_path, str) and output_path.endswith('.csv') == False:
             raise ValueError("output_path must end with '.csv'")
 
@@ -105,7 +128,8 @@ class similarity:
         matrix = np.array([])
 
         # calculate the distance between all objects
-
+        total_jobs = len(all_ids) * (len(all_ids) - 1) / 2
+        progress = tqdm(total=total_jobs, desc="Calculating distance matrix")
         for i, id1 in enumerate(all_ids):
             row = np.array([0]*(i+1)) # set zero for all ids before the diagonal
             for id2 in all_ids[i+1:]:
@@ -117,6 +141,7 @@ class similarity:
                 matrix = row
             else:
                 matrix = np.vstack((matrix, row))
+            progress.update(len(all_ids) - i - 1)
             
             # save the matrix to a file if the interval is reached
             if isinstance(output_path, str) and matrix.ndim > 1 and matrix.shape[0] % save_interval == 0:
@@ -125,13 +150,16 @@ class similarity:
         
         # make sure the full matrix is saved
         if isinstance(output_path, str):
-            self.save(matrix, output_path, header)
+            mirrored_matrix = self.save(matrix, output_path, header)
             print("Distance matrix calculated and saved to 'distance_matrix.csv'")
         else:
-            matrix = self.mirror(matrix)
+            mirrored_matrix = self.mirror(matrix)
             print("Distance matrix calculated")
-        # TODO: make possibility to plot the matrix
-        return matrix, all_ids
+        
+        if plot:
+            self.plot(mirrored_matrix, all_ids)
+
+        return mirrored_matrix, all_ids
 
 if __name__ == '__main__':
     #TODO: check if everything works with the -0 / NL.IMBAG.Pand and without those
@@ -141,3 +169,4 @@ if __name__ == '__main__':
     sim = similarity(path)
 
     sim.distance_matrix(output_path="distance_matrix.csv")
+    # gpdf = gpd.read_file(path)
