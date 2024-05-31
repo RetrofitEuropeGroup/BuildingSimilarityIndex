@@ -7,7 +7,7 @@ try:
     from helpers.mesh import to_pymesh, to_pyvista, intersect
     pymesh_exists = True
 except:
-    print("WARNING: pymesh not found! Exchange index calculation will be omitted...")
+    # print("WARNING: pymesh not found! Exchange index calculation will be omitted...")
     pymesh_exists = False
 import miniball
 import numpy as np
