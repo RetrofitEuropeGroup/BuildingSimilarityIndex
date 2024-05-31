@@ -642,8 +642,9 @@ def main(input,
         val3dity_cmd_location = os.path.join(os.getcwd(), 'processing/metrics/val3dity/val3dity')
 
     # create and open the report
-    subprocess.check_output(f'{val3dity_cmd_location} "{input.name}" -r "{val3dity_report}"')
-    val3dity_report = open(val3dity_report, "rb")
+    if os.path.exists(val3dity_report) == False:
+        subprocess.check_output(f'{val3dity_cmd_location} "{input.name}" -r "{val3dity_report}"')
+    report = open(val3dity_report, "rb")
 
 
     if "transform" in cm:
@@ -653,11 +654,6 @@ def main(input,
                 for v in cm["vertices"]]
     else:
         verts = cm["vertices"]
-
-    if val3dity_report is None:
-        report = {}
-    else:
-        report = json.load(val3dity_report)
 
     # mesh points
     vertices = np.array(verts)
@@ -677,6 +673,7 @@ def main(input,
             total_jobs += 1
 
     if single_threaded or jobs == 1:
+        print(f'Processing {total_jobs} buildings on a single core...')
         for obj in tqdm(cm["CityObjects"], total=len(cm["CityObjects"])):
             if not eligible(cm, obj, report):
                 continue
@@ -705,39 +702,43 @@ def main(input,
     else:
         from concurrent.futures import ProcessPoolExecutor
         num_cores = jobs
-
+        print(f'Using {num_cores} cores to process {total_jobs} buildings')
         with ProcessPoolExecutor(max_workers=num_cores) as pool:
-            futures = []
+            with tqdm(total=total_jobs) as progress:
+ 
+                futures = []
 
-            for obj in cm["CityObjects"]:
-                if not eligible(cm, obj, report):
-                    continue
+                for obj in cm["CityObjects"]:
+                    if not eligible(cm, obj, report):
+                        continue
 
-                neighbours = get_neighbours(cm, obj, r, verts)
-                indices_list = [] if without_indices else None
+                    neighbours = get_neighbours(cm, obj, r, verts)
+                    indices_list = [] if without_indices else None
 
-                future = pool.submit(process_building,
-                                    cm["CityObjects"][obj],
-                                    obj,
-                                    filter,
-                                    repair,
-                                    plot_buildings,
-                                    density_2d,
-                                    density_3d,
-                                    vertices,
-                                    neighbours,
-                                    indices_list)
-                futures.append(future)
+                    future = pool.submit(process_building,
+                                        cm["CityObjects"][obj],
+                                        obj,
+                                        filter,
+                                        repair,
+                                        plot_buildings,
+                                        density_2d,
+                                        density_3d,
+                                        vertices,
+                                        neighbours,
+                                        indices_list)
+                    future.add_done_callback(lambda p: progress.update())
+                    futures.append(future)
 
-                for future in futures:
-                    try:
-                        obj, vals = future.result()
-                        if not vals is None:
-                            stats[obj] = vals
-                    except Exception as e:
-                        print(f"Problem with {obj}: {e}")
-                        if break_on_error:
-                            raise e
+
+                    for future in futures:
+                        try:
+                            obj, vals = future.result()
+                            if not vals is None:
+                                stats[obj] = vals
+                        except Exception as e:
+                            print(f"Problem with {obj}: {e}")
+                            if break_on_error:
+                                raise e
 
     df = pd.DataFrame.from_dict(stats, orient="index")
     df.index.name = "id"
