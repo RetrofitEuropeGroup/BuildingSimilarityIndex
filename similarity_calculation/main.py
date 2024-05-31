@@ -82,6 +82,7 @@ class similarity:
         return 1 / (1 + normalized_dist)
     
     def distance_matrix(self, output_path: str = None, save_interval: int = 100):
+        # TODO: you can also make half the matrix and then mirror it
         if isinstance(output_path, str) and output_path.endswith('.csv') == False:
             raise ValueError("output_path must end with '.csv'")
 
@@ -97,7 +98,7 @@ class similarity:
                 if id1 == id2:
                     dist = 0
                 else:
-                    dist = sim.calculate_distance(id1, id2)
+                    dist = self.calculate_distance(id1, id2)
                 row = np.append(row, round(dist, 5))
             
             # add row to matrix
@@ -117,9 +118,11 @@ class similarity:
             print("Distance matrix calculated and saved to 'distance_matrix.csv'")
         else:
             print("Distance matrix calculated")
-        return matrix
+        
+        return matrix, all_ids
 
 if __name__ == '__main__':
+    #TODO: check if everything works with the -0 / NL.IMBAG.Pand and without those
     path = "collection/output/merged.gpkg"
 
     # sim = similarity(path, {'dispersion_index_2d': 1, 'dispersion_index_3d': 1})
