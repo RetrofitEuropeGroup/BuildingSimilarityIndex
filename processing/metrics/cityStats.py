@@ -286,21 +286,21 @@ def get_neighbours(cm, obj, r, verts):
     return [cm["CityObjects"][objid]["geometry"][0] for objid in objids]
 
 def save_filter_stats(outfiltered_2d, outfiltered_3d, output):
+    # split the output path to get the output folder
+    output_folder_parts = os.path.split(output)[:-1]
+    logger_path = os.path.join(*output_folder_parts, "filtered_buildings.csv")
 
-    output_folder_parts = output.split("/")[:-1]
-    output_folder = "/".join(output_folder_parts)
 
-    logger = f"{output_folder}/filtered_buildings.csv"
-    tile_num = output.split("/")[-1].split(".")[0]
+    output_name = os.path.split(output)[-1]
 
     # update the logger
-    new_line = f'{tile_num};{round(outfiltered_2d, 4)};{round(outfiltered_3d, 4)}\n'
-    if os.path.exists(logger):
-        with open(logger, 'a') as f:
+    new_line = f'{output_name};{round(outfiltered_2d, 4)};{round(outfiltered_3d, 4)}\n'
+    if os.path.exists(logger_path):
+        with open(logger_path, 'a') as f:
             f.write(new_line)
     else:
-        with open(logger, 'w') as f:
-            f.write('building_id;filtered_2d;filtered_3d\n')
+        with open(logger_path, 'w') as f:
+            f.write('output_filename;filtered_2d;filtered_3d\n')
             f.write(new_line)
 
 
@@ -702,7 +702,6 @@ def main(input,
         print(f'Using {num_cores} cores to process {total_jobs} buildings')
         with ProcessPoolExecutor(max_workers=num_cores) as pool:
             with tqdm(total=total_jobs) as progress:
- 
                 futures = []
 
                 for obj in cm["CityObjects"]:
@@ -739,8 +738,12 @@ def main(input,
 
     df = pd.DataFrame.from_dict(stats, orient="index")
     df.index.name = "id"
-
-    clean = clean_df(df, output)
+    try:
+        clean = clean_df(df, output)
+    except Exception as e:
+        print(f"ERROR: Problem with cleaning the dataframe: {e}")
+        clean = df
+    
     try:
         if output.endswith(".csv"):
             clean.to_csv(output)
