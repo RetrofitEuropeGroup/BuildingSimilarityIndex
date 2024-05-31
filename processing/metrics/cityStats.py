@@ -640,9 +640,13 @@ def main(input,
 
     # create and open the report
     if os.path.exists(val3dity_report) == False:
-        print(f'{val3dity_cmd_location} {input.name} -r {val3dity_report}')
-        subprocess.check_output(f'{val3dity_cmd_location} {input.name} -r {val3dity_report}')
-    report = open(val3dity_report, "rb")
+        try:
+            subprocess.check_output(f'{val3dity_cmd_location} {input.name} -r {val3dity_report}')
+            report = open(val3dity_report, "rb")
+        except Exception as e:
+            print(f"Warning: Could not run val3dity, continuing without report")
+    else:
+        report = open(val3dity_report, "rb")
 
 
     if "transform" in cm:
