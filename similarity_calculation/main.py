@@ -72,15 +72,26 @@ class similarity:
 
         dist = euclidean_distances(obj1[self.columns], obj2[self.columns])
         return dist[0][0]
-
+    
+    def calculate_similarity(self, id1, id2):
+        dist = self.calculate_distance(id1, id2)
+        if self.column_weights is not None:
+            normalized_dist = dist / sum(self.column_weights.values())
+        else:
+            normalized_dist = dist / len(self.columns)
+        return 1 / (1 + normalized_dist)
 
 if __name__ == '__main__':
     path = "collection/output/merged.gpkg"
 
-    sim = similarity(path, {'dispersion_index_2d': 2, 'dispersion_index_3d': 1})
+    # sim = similarity(path, {'dispersion_index_2d': 1, 'dispersion_index_3d': 1})
+    sim = similarity(path)
 
     id1 = "NL.IMBAG.Pand.0327100000255061-0"
     id2 = "NL.IMBAG.Pand.0327100000264673-0"
 
     dist = sim.calculate_distance(id1, id2)
     print('Distance between the two objects is: ', dist)
+
+    simi = sim.calculate_similarity(id1, id2)
+    print('Similarity between the two objects is: ', simi)
