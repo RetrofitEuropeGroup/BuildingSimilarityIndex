@@ -640,7 +640,8 @@ def main(input,
 
     # create and open the report
     if os.path.exists(val3dity_report) == False:
-        subprocess.check_output(f'{val3dity_cmd_location} "{input.name}" -r "{val3dity_report}"')
+        print(f'{val3dity_cmd_location} {input.name} -r {val3dity_report}')
+        subprocess.check_output(f'{val3dity_cmd_location} {input.name} -r {val3dity_report}')
     report = open(val3dity_report, "rb")
 
 
