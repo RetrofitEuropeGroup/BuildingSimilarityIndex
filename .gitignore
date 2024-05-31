@@ -6,3 +6,4 @@ collection/input/*
 */val3dity.log
 val3dity.log
 *.py~
+analysis/*
