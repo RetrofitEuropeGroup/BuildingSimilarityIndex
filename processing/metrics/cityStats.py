@@ -1,6 +1,5 @@
 import json
 import os
-import dotenv
 import math
 import subprocess
 
@@ -18,8 +17,6 @@ from tqdm import tqdm
 import cityjson
 import geometry
 import shape_index as si
-
-dotenv.load_dotenv(dotenv_path='.env')
 
 def get_bearings(values, num_bins, weights):
     """Divides the values depending on the bins"""
