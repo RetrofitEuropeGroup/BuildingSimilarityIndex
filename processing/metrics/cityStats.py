@@ -346,6 +346,9 @@ def clean_df(df, output):
     return clean
 
 def eligible(cm, id, report):
+    if report == {}:
+        return True
+    
     errors = get_errors_from_report(report, id, cm)
     if errors:
         return False
@@ -633,6 +636,7 @@ def main(input,
     # create the val3dity report with the same name as the input file
     val3dity_report = f"{input.name[:-5]}_report.json"
     # determine the location of the val3dity command
+    # TODO: this can just be 1 line right? No need to check
     if 'processing' in os.getcwd():
         val3dity_cmd_location = os.path.join(os.getcwd(), 'metrics/val3dity/val3dity')
     else:
@@ -644,6 +648,7 @@ def main(input,
             subprocess.check_output(f'{val3dity_cmd_location} {input.name} -r {val3dity_report}')
             report = open(val3dity_report, "rb")
         except Exception as e:
+            report = {}
             print(f"Warning: Could not run val3dity, continuing without report")
     else:
         report = open(val3dity_report, "rb")
