@@ -52,8 +52,8 @@ class MergeCityJSON:
             if file_name == 'merged.city.json': # merged.city.json already exists, try one with a version number
                 version_num = 0
             else:
-                version_num = int(file_name.split('(')[1].split(')')[0])
-            file_name = f"merged ({version_num + 1}).city.json"
+                version_num = int(file_name.split('_')[1].split('.')[0])
+            file_name = f"merged_{version_num + 1}.city.json"
         self.file_name = file_name
 
     def save(self):
