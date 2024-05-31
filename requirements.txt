@@ -18,4 +18,5 @@ scikit-learn===1.3.2
 pytest
 pytest-cov
 cjio==0.9.0
+aiohttp
 requests==2.31.0 #TODO: add the version for the other packages
