@@ -81,8 +81,21 @@ class similarity:
             normalized_dist = dist / len(self.columns)
         return 1 / (1 + normalized_dist)
     
+    def mirror(self, matrix):
+        upper_tri = np.triu(matrix)
+        lower_tri = upper_tri.T
+        symmetric_matrix = upper_tri + lower_tri
+        return symmetric_matrix
+
+    def save(self, matrix, output_path, header):
+        if matrix.shape[0] == matrix.shape[1]:
+            print("Matrix is square")
+            matrix = self.mirror(matrix)
+        
+        np.savetxt(output_path, matrix, delimiter=",", fmt='%f', header=header, comments='')
+
+
     def distance_matrix(self, output_path: str = None, save_interval: int = 100):
-        # TODO: you can also make half the matrix and then mirror it
         if isinstance(output_path, str) and output_path.endswith('.csv') == False:
             raise ValueError("output_path must end with '.csv'")
 
@@ -92,15 +105,13 @@ class similarity:
         matrix = np.array([])
 
         # calculate the distance between all objects
-        for id1 in all_ids:
-            row = np.array([])
-            for id2 in all_ids:
-                if id1 == id2:
-                    dist = 0
-                else:
-                    dist = self.calculate_distance(id1, id2)
+
+        for i, id1 in enumerate(all_ids):
+            row = np.array([0]*(i+1)) # set zero for all ids before the diagonal
+            for id2 in all_ids[i+1:]:
+                dist = self.calculate_distance(id1, id2)
                 row = np.append(row, round(dist, 5))
-            
+
             # add row to matrix
             if matrix.size == 0:
                 matrix = row
@@ -109,32 +120,24 @@ class similarity:
             
             # save the matrix to a file if the interval is reached
             if isinstance(output_path, str) and matrix.ndim > 1 and matrix.shape[0] % save_interval == 0:
-                np.savetxt(output_path, matrix, delimiter=",", fmt='%f', header=header, comments='')
+                self.save(matrix, output_path, header)
                 #TODO: just append the new rows to the file instead of saving the whole matrix
         
         # make sure the full matrix is saved
         if isinstance(output_path, str):
-            np.savetxt(output_path, matrix, delimiter=",", fmt='%f', header=header, comments='')
+            self.save(matrix, output_path, header)
             print("Distance matrix calculated and saved to 'distance_matrix.csv'")
         else:
+            matrix = self.mirror(matrix)
             print("Distance matrix calculated")
-        
+        # TODO: make possibility to plot the matrix
         return matrix, all_ids
 
 if __name__ == '__main__':
     #TODO: check if everything works with the -0 / NL.IMBAG.Pand and without those
-    path = "collection/output/merged.gpkg"
-
+    path = "analysis/voorbeeld_woningen.gpkg"
+    
     # sim = similarity(path, {'dispersion_index_2d': 1, 'dispersion_index_3d': 1})
     sim = similarity(path)
 
-    id1 = "NL.IMBAG.Pand.0327100000255061-0"
-    id2 = "NL.IMBAG.Pand.0327100000264673-0"
-
-    dist = sim.calculate_distance(id1, id2)
-    print('Distance between the two objects is: ', dist)
-
-    simi = sim.calculate_similarity(id1, id2)
-    print('Similarity between the two objects is: ', simi)
-
-    sim.distance_matrix(output_path="distance_matrix.csv", save_interval=5)
+    sim.distance_matrix(output_path="distance_matrix.csv")
