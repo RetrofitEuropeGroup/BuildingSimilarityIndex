@@ -9,13 +9,23 @@ sys.path.append(parent_dir)
 from processing.merge_cityjson import MergeCityJSON
 
 class processing():
-    def __init__(self, input_folder: str = None, input_file: str = None):
+    def __init__(self, input_folder: str = None, input_file: str = None, gpkg_path: str = None):
         self.input_folder = input_folder
         self.input_file = input_file
-
+        self._set_gpkg_path(gpkg_path)
+        
         if input_folder is not None and input_file is not None:
             raise ValueError("It is not possible to use both input_folder and input_file")
 
+    def _set_gpkg_path(self, gpkg_path):
+        if gpkg_path is None:
+            self.gpkg_path = self.input_file.replace('.city.json', '.gpkg')
+        elif gpkg_path.endswith('.gpkg') == False:
+            raise ValueError("The gpkg_path (output file) is the path to where the geopackage data frame will be saved. Extension should be .gpkg")
+        else:
+            self.gpkg_path = gpkg_path
+
+    # main functions
     def merge_files(self):
         """ Merges the files in the input folder to a single file"""
         merger = MergeCityJSON(self.input_folder)
@@ -32,7 +42,6 @@ class processing():
             city_stats_location =  "processing/metrics/cityStats.py"
 
         # run the citystats script
-        self.gpkg_path = self.input_file.replace('.city.json', '.gpkg')
         command = f'python {city_stats_location} {self.input_file} -j {n_processors} -o {self.gpkg_path}'
         os.system(command)
 
