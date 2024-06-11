@@ -39,33 +39,13 @@ def compute_stats(values, percentile = 90, percentage = 75):
         hDic['Mode'] = np.mean(values)
     return hDic
 
-def add_value(dict, key, value):
-    """Does dict[key] = dict[key] + value"""
-
-    if key in dict:
-        dict[key] = dict[key] + value
-    else:
-        area[key] = value
-
 def convexhull_volume(points):
     """Returns the volume of the convex hull"""
-
     try:
         return ss.ConvexHull(points).volume
     except Exception as e:
+        print(f"Error: {e}")
         return 0
-
-def boundingbox_volume(points):
-    """Returns the volume of the bounding box"""
-
-    minx = min(p[0] for p in points)
-    maxx = max(p[0] for p in points)
-    miny = min(p[1] for p in points)
-    maxy = max(p[1] for p in points)
-    minz = min(p[2] for p in points)
-    maxz = max(p[2] for p in points)
-
-    return (maxx - minx) * (maxy - miny) * (maxz - minz)
 
 def get_errors_from_report(report, objid, cm):
     """Return the report for the feature of the given obj"""
@@ -91,51 +71,10 @@ def get_errors_from_report(report, objid, cm):
 
     return []
 
-def tree_generator_function(cm, verts):
-    for i, objid in enumerate(cm["CityObjects"]):
-        obj = cm["CityObjects"][objid]
-
-        if len(obj["geometry"]) == 0:
-            continue
-
-        xmin, xmax, ymin, ymax, zmin, zmax = cityjson.get_bbox(obj["geometry"][0], verts)
-        yield (i, (xmin, ymin, zmin, xmax, ymax, zmax), objid)
-
-def get_neighbours(cm, obj, r, verts):
-    """Return the neighbours of the given building"""
-
-    building = cm["CityObjects"][obj]
-
-    if len(building["geometry"]) == 0:
-        return []
-
-    try:
-        geom = building["geometry"][2]
-    except:
-        print(f"Problem with {obj}, it has geometry of length {len(building['geometry'])}! Omitting...")
-        geom = building["geometry"][0]
-
-    xmin, xmax, ymin, ymax, zmin, zmax = cityjson.get_bbox(geom, verts)
-    objids = [n.object
-            for n in r.intersection((xmin,
-                                    ymin,
-                                    zmin,
-                                    xmax,
-                                    ymax,
-                                    zmax),
-                                    objects=True)
-            if n.object != obj]
-
-    if len(objids) == 0:
-        objids = [n.object for n in r.nearest((xmin, ymin, zmin, xmax, ymax, zmax), 5, objects=True) if n.object != obj]
-
-    return [cm["CityObjects"][objid]["geometry"][0] for objid in objids]
-
 def save_filter_stats(outfiltered_2d, outfiltered_3d, output):
     # split the output path to get the output folder
     output_folder_parts = os.path.split(output)[:-1]
     logger_path = os.path.join(*output_folder_parts, "filtered_buildings.csv")
-
 
     output_name = os.path.split(output)[-1]
 
@@ -151,6 +90,8 @@ def save_filter_stats(outfiltered_2d, outfiltered_3d, output):
 
 
 def clean_df(df, output):
+    """Cleans the dataframe, it removes the buildings with errors, 
+    holes, and buildings with index values out of the normal range."""
     ## filter based on some conditions
     # filter out the buldings with actual_volume lower than 40, no holes
     # and actual volume larger than convex hull volume
@@ -192,6 +133,7 @@ def clean_df(df, output):
     return clean
 
 def eligible(cm, id, report):
+    """Returns True if the building is eligible for processing"""
     if report == {}:
         return True
     
@@ -208,6 +150,7 @@ def eligible(cm, id, report):
     return True
 
 def get_parent_attributes(cm, obj):
+    """Returns the attributes of the parent of the given object. The parent should be in the same city model."""
     building = cm["CityObjects"][obj]
     if "parents" in building.keys():
         parent_id = building["parents"][0]
@@ -216,6 +159,26 @@ def get_parent_attributes(cm, obj):
     else:
         return None
 
+def get_report(input):
+    # create the val3dity report with the same name as the input file
+    val3dity_report = f"{input.name[:-5]}_report.json"
+    # determine the location of the val3dity command
+    # TODO: this can just be 1 line right? No need to check if it's in processing or not
+    if 'processing' in os.getcwd():
+        val3dity_cmd_location = os.path.join(os.getcwd(), 'metrics/val3dity/val3dity')
+    else:
+        val3dity_cmd_location = os.path.join(os.getcwd(), 'processing/metrics/val3dity/val3dity')
+
+    if os.path.exists(val3dity_report):
+        report = open(val3dity_report, "rb")
+    else:
+        try:
+            subprocess.check_output(f'{val3dity_cmd_location} {input.name} -r {val3dity_report}')
+            report = open(val3dity_report, "rb")
+        except Exception as e:
+            report = {}
+            print(f"Warning: Could not run val3dity, continuing without report")        
+    return report
 
 class StatValuesBuilder:
 
@@ -272,17 +235,14 @@ def process_building(building,
         print(f"Plotting {obj}")
         tri_mesh.plot(show_grid=True)
 
-
     if repair:
         mfix = MeshFix(tri_mesh)
         mfix.repair()
-
         fixed = mfix.mesh
     else:
         fixed = tri_mesh
 
     points = cityjson.get_points(geom, vertices)
-
     ch_volume = convexhull_volume(points)
 
     if "semantics" in geom:
@@ -376,7 +336,6 @@ def process_building(building,
 @click.option('-r', '--repair', flag_value=True)
 @click.option('-p', '--plot-buildings', flag_value=True)
 @click.option('--without-indices', flag_value=True)
-@click.option('-b', '--break-on-error', flag_value=True)
 @click.option('-j', '--jobs', default=1)
 @click.option('--density-2d', default=1.0)
 @click.option('--density-3d', default=1.0)
@@ -386,7 +345,6 @@ def main(input,
          repair,
          plot_buildings,
          without_indices,
-         break_on_error,
          jobs,
          density_2d,
          density_3d):
@@ -398,26 +356,8 @@ def main(input,
         output = input.name[:-5] + ".csv"
         output = output.replace('input', 'output')
 
-    # create the val3dity report with the same name as the input file
-    val3dity_report = f"{input.name[:-5]}_report.json"
-    # determine the location of the val3dity command
-    # TODO: this can just be 1 line right? No need to check if it's in processing or not
-    if 'processing' in os.getcwd():
-        val3dity_cmd_location = os.path.join(os.getcwd(), 'metrics/val3dity/val3dity')
-    else:
-        val3dity_cmd_location = os.path.join(os.getcwd(), 'processing/metrics/val3dity/val3dity')
-
     # create and open the report
-    if os.path.exists(val3dity_report) == False:
-        try:
-            subprocess.check_output(f'{val3dity_cmd_location} {input.name} -r {val3dity_report}')
-            report = open(val3dity_report, "rb")
-        except Exception as e:
-            report = {}
-            print(f"Warning: Could not run val3dity, continuing without report")
-    else:
-        report = open(val3dity_report, "rb")
-
+    report = get_report(input)
 
     if "transform" in cm:
         s = cm["transform"]["scale"]
@@ -430,11 +370,6 @@ def main(input,
     # mesh points
     vertices = np.array(verts)
 
-    # Build the index of the city model
-    p = rtree.index.Property()
-    p.dimension = 3
-    r = rtree.index.Index(tree_generator_function(cm, vertices), properties=p)
-
     # Count the number of jobs
     total_jobs = 0
     for obj in cm["CityObjects"]:
@@ -445,8 +380,8 @@ def main(input,
     num_cores = jobs
     print(f'Using {num_cores} cores to process {total_jobs} buildings')
     with ProcessPoolExecutor(max_workers=num_cores) as pool:
+        # add the jobs to the pool
         futures = []
-
         for obj in cm["CityObjects"]:
             if not eligible(cm, obj, report):
                 continue
@@ -468,7 +403,8 @@ def main(input,
                                 vertices,
                                 indices_list)
             futures.append(future)
-                
+
+        # wait for the jobs to finish and add the results to the stats
         with tqdm(total=total_jobs) as progress:
             stats = {}
             for future in as_completed(futures):
@@ -476,8 +412,7 @@ def main(input,
                 obj, vals = future.result()
                 if not vals is None:
                     stats[obj] = vals
-                # report the result
-                progress.update(1)
+                progress.update(1) # update the progress bar
 
     df = pd.DataFrame.from_dict(stats, orient="index")
     df.index.name = "id"
