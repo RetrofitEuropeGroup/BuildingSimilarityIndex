@@ -1,5 +1,6 @@
 import os
 import sys
+from pathlib import Path
 
 # if we run the script from the processing folder, we need to add the parent folder to the path
 # otherwise it won't search for processing.merge_cityjson in the root folder of the repository
@@ -10,16 +11,25 @@ from processing.merge_cityjson import MergeCityJSON
 
 class processing():
     def __init__(self, input_folder: str = None, input_file: str = None, gpkg_path: str = None):
+        if input_folder is None and input_file is None:
+            raise ValueError("Either input_folder or input_file should be provided")
+        elif input_folder is not None and input_file is not None:
+            raise ValueError("It is not possible to use both input_folder and input_file")
+        
         self.input_folder = input_folder
         self.input_file = input_file
         self._set_gpkg_path(gpkg_path)
         
-        if input_folder is not None and input_file is not None:
-            raise ValueError("It is not possible to use both input_folder and input_file")
 
     def _set_gpkg_path(self, gpkg_path):
-        if gpkg_path is None:
+        if gpkg_path is None and self.input_file is not None:
             self.gpkg_path = self.input_file.replace('.city.json', '.gpkg')
+        elif gpkg_path is None and self.input_folder is not None:
+            # TODO: change this to a more dynamic name
+            # TODO: we should not assume that the output folder is called output and that the input folder is called input
+            self.gpkg_path = f"{self.input_folder.replace('input', 'output')}/output.gpkg" 
+        elif isinstance(gpkg_path, str) == False:
+            raise ValueError("The gpkg_path (output file) should be a string")
         elif gpkg_path.endswith('.gpkg') == False:
             raise ValueError("The gpkg_path (output file) is the path to where the geopackage data frame will be saved. Extension should be .gpkg")
         else:
@@ -62,4 +72,4 @@ if __name__ == '__main__':
     p.run()
     import geopandas as gpd
     gdf = gpd.read_file(p.gpkg_path)
-    print(gdf)
+    print(gdf.columns)
