@@ -361,6 +361,15 @@ def eligible(cm, id, report):
         return False
     return True
 
+def get_parent_attributes(cm, obj):
+    building = cm["CityObjects"][obj]
+    if "parents" in building.keys():
+        parent_id = building["parents"][0]
+        parent = cm["CityObjects"][parent_id]
+        return parent['attributes']
+    else:
+        return None
+
 
 class StatValuesBuilder:
 
@@ -495,6 +504,12 @@ def process_building(building,
         # "surface_count": len(cityjson.get_surface_boundaries(geom)),
         "actual_volume": fixed.volume,
         "convex_hull_volume": ch_volume,
+        "oorspronkelijkbouwjaar": building['attributes']['oorspronkelijkbouwjaar'],
+        "b3_opp_buitenmuur": building['attributes']['b3_opp_buitenmuur'],
+        "b3_opp_dak_plat": building['attributes']['b3_opp_dak_plat'],
+        "b3_opp_dak_schuin": building['attributes']['b3_opp_dak_schuin'],
+        "b3_opp_grond": building['attributes']['b3_opp_grond'],
+        "b3_opp_scheidingsmuur": building['attributes']['b3_opp_scheidingsmuur'],
         # "obb_volume": obb.volume,
         # "aabb_volume": aabb_volume,
         # "footprint_perimeter": shape.length,
@@ -636,7 +651,7 @@ def main(input,
     # create the val3dity report with the same name as the input file
     val3dity_report = f"{input.name[:-5]}_report.json"
     # determine the location of the val3dity command
-    # TODO: this can just be 1 line right? No need to check
+    # TODO: this can just be 1 line right? No need to check if it's in processing or not
     if 'processing' in os.getcwd():
         val3dity_cmd_location = os.path.join(os.getcwd(), 'metrics/val3dity/val3dity')
     else:
@@ -686,10 +701,14 @@ def main(input,
                 continue
 
             neighbours = get_neighbours(cm, obj, r, verts)
+            building = cm["CityObjects"][obj]
+
+            if 'attributes' not in building:
+                building['attributes'] = get_parent_attributes(cm, obj)
 
             indices_list = [] if without_indices else None
             try:
-                obj, vals = process_building(cm["CityObjects"][obj],
+                obj, vals = process_building(building,
                                 obj,
                                 filter,
                                 repair,
@@ -719,10 +738,15 @@ def main(input,
                         continue
 
                     neighbours = get_neighbours(cm, obj, r, verts)
+
+                    building = cm["CityObjects"][obj]
+                    if 'attributes' not in building:
+                        building['attributes'] = get_parent_attributes(cm, obj) #TODO: check do we process multiple childs of the same parent?
+
                     indices_list = [] if without_indices else None
 
                     future = pool.submit(process_building,
-                                        cm["CityObjects"][obj],
+                                        building,
                                         obj,
                                         filter,
                                         repair,
