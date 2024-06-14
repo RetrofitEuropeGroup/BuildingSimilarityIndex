@@ -8,8 +8,8 @@ sys.path.append(parent_dir)
 from collection.async_requests import request_url_list
 
 class collection():
-    def __init__(self, input_folder: str = "./collection/input"):
-        self.input_folder = input_folder
+    def __init__(self):
+        self.bag_data_folder = 'data/bag_data'
 
     def convert_to_cityjson(self, data: dict):
         """Converts the data from the request to CityJSON format."""
@@ -21,25 +21,25 @@ class collection():
 
     def save(self, cityjson: dict, id: str):
         """Saves the CityJSON data to a file."""
-        with open(f'{self.input_folder}/{id}.city.json', 'w') as file:
+        with open(f'{self.bag_data_folder}/{id}.city.json', 'w') as file:
             json.dump(cityjson, file)
 
-    def check_input_folder(self):
-        """Checks if the input folder exists and is a folder, if not it will be created. If it exists and is not empty, a warning is printed."""
-        if not os.path.exists(self.input_folder):
-            os.makedirs(self.input_folder)
-        elif not os.path.isdir(self.input_folder):
-            raise ValueError("The input_folder should be a directory, not a file.")
-        elif len(os.listdir(self.input_folder)) > 1:
-            print("WARNING: the input folder is not empty, the data will be overwritten if it already exists")
-        elif len(os.listdir(self.input_folder)) == 1 and os.path.exists(f"{self.input_folder}/.gitkeep") == False:
-            print("WARNING: the input folder is not empty, the data will be overwritten if it already exists")
+    def check_bag_data_folder(self):
+        """Checks if the bag_data folder exists and is a folder, if not it will be created. If it exists and is not empty, a warning is printed."""
+        if not os.path.exists(self.bag_data_folder):
+            os.makedirs(self.bag_data_folder)
+        elif not os.path.isdir(self.bag_data_folder):
+            raise ValueError("The bag_data_folder should be a directory, not a file.")
+        elif len(os.listdir(self.bag_data_folder)) > 1:
+            print("WARNING: the bag_data folder is not empty, the data will be overwritten if it already exists")
+        elif len(os.listdir(self.bag_data_folder)) == 1 and os.path.exists(f"{self.bag_data_folder}/.gitkeep") == False:
+            print("WARNING: the bag_data folder is not empty, the data will be overwritten if it already exists")
         # else: the folder is empty, so no warning is needed
 
     def collect_id_list(self, all_ids: list):
         """Requests and save the data in cityjson format for all the ids in the list."""
 
-        self.check_input_folder()
+        self.check_bag_data_folder()
 
         # Remove the prefix from the ids so they are consistent. also check if the file already exists to avoid unnecessary requests
         request_ids = []
@@ -47,7 +47,7 @@ class collection():
             if id.startswith("NL.IMBAG.Pand."):
                 id = id[14:]
 
-            if os.path.exists(f"{self.input_folder}/{id}.city.json"):
+            if os.path.exists(f"{self.bag_data_folder}/{id}.city.json"):
                 print(f"File {id}.city.json already exists, skipping")
             else:
                 request_ids.append(id)
