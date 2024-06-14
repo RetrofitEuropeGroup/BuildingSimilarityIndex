@@ -5,6 +5,7 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import reference_polygons
 from shapely.affinity import translate
+from sklearn.preprocessing import MinMaxScaler
 
 
 def save_pollist(plist, filename, path="./"):
@@ -62,6 +63,8 @@ def update_geo(geometry):
 
 ### Functions for calculating turning functions and distances
 def truncate_angle(an):
+    """ rescale angles to be [0, pi] s.t. if an > pi, an-> 2*pi - an.
+    """
     if an > np.pi:
         an = 2*np.pi - an
     return an
@@ -69,6 +72,10 @@ def truncate_angle(an):
 # Transforming the coord vectors into pairs of vectors corresponding with the normalized cumulative length and corresponding cumulative angle, 
 # and the total length of the vector
 def get_turning(coords_list, norm = True, tot_length = False):
+    """ Get turning function from list of polygon coordinates.
+    Optional arguments:
+    norm(bool): normalize turning function to be of unit length.
+    tot_length(bool): return total length or not"""
     size = len(coords_list)
     # Omzetten coordinaten naar verschil vectoren.
     vectors = [np.subtract(coords_list[i+1],coords_list[i]) for i in range(size-1)]
@@ -94,6 +101,7 @@ def get_turning(coords_list, norm = True, tot_length = False):
 ## Input: Twee turning function vectoren
 # input: twee paren vectoren, eerste vector uit paar is genormaliseerde cumulatieve lengte, tweede vector uit paar is bijbehorende hoek in radialen.
 def matching_lengths(v1,v2):
+    """ Combines two turning functions, such that they have angle values at the union of their lengh points, instead of only at the points where the angle changes... don't really know how to explain this more clearly."""
     len1 = len(v1[1])
     len2 = len(v2[1])
     i=0
@@ -127,6 +135,14 @@ def matching_lengths(v1,v2):
 # input: twee turning vectoren met dezelfde lengte, optionele specificatie voor gebruikte metriek.
 # output: de niet-geminimaliseerde afstand tussen de turning functies
 def compare_turning(vec1,vec2,metric='l1'):
+    """ Compare turning: computes distance metric between two turning functions. Assumes both turning functions have the same length/number of break points.
+    Optional argument:
+    metric: 'l1' or 'l2'. 
+
+    Computes:
+    $[\int_{0}^{1} (\phi_1(s) - \ph_2(s) )^{l} ds ]^{1/l}$
+    for two given turning functions with l the specific l-norm.
+    """
     diff_len = seq_to_diff(vec1[0])
     subt = np.abs(vec1[1] - vec2[1])
     subt = [min(i, 2*np.pi - i) for i in subt]
@@ -148,11 +164,15 @@ def dist_coords(coords1, coords2, metric='l1', norm=True, tot_length=False):
 # input: twee lijsten coordinaten, met optionele parameters
 # output: de niet-geminimaliseerde afstand tussen de turning functies behorende bij de coordinate vectors
 def dist_coords2(tf1, tf2, metric='l1'):
+    """ Computes normalized distance between two turning functions after matching their lengths"""
     tf1, tf2 = matching_lengths(tf1, tf2)
     return compare_turning(tf1, tf2, metric)/np.pi
 
 
 def rotate_tf(tf):
+    """Rotate_tf: 
+    Computes new turning function from old turning function by starting at the next initial point. 
+    i.e. this corresponds to rotating the polygon by one vertex and computing the turning function"""
     x = tf[0]
     y = tf[1]
     xnew = np.append(np.subtract(x[1:], x[0]), 1.0)
@@ -165,6 +185,9 @@ def rotate_tf(tf):
     return (xnew, np.array(list(map(make_pos, ynew))))
 
 def rotate_until_corner(tf):
+    """ Rotates turning function until a large angle is encountered if any large angles exist. 
+    Taking large angles as initial points helps with filtering out inaccuracies existing in the data imported from BAG.
+    """
     c = 0
     while tf[1][-1] < 0.5 and c < len(tf[1]):
         tf = rotate_tf(tf)
@@ -172,6 +195,9 @@ def rotate_until_corner(tf):
     return tf
 
 def minimize_dist(coords1, coords2, metric='l1', norm=True, tot_length=False):
+    """
+    Minimizes the turning function distance between two turning functions by rotating mirroring one polygon.
+    """
     if len(coords1) <= len(coords2):
         tf1 = get_turning(coords1, norm=norm, tot_length=tot_length)
         tf2 = get_turning(coords2, norm=norm, tot_length=tot_length)
@@ -195,13 +221,20 @@ def minimize_dist(coords1, coords2, metric='l1', norm=True, tot_length=False):
         dist = np.amin([dist, d, d2])
     return dist
 
+## Reference polygons computed by doing 30 PCA loops of the feature space.
+## POlygons were taken from both real complexes in The Netherlands and generated parameterized polygons.
 reference_shapes = load_pollist("30_ref_pols", path="reference_polygons/")
 reference_shapes_coords = [pol_to_vec(i) for i in reference_shapes]
 
 def convexity(pol):
+    """ 2D convexity measure.
+    Computed by dividing the area of a polygon by the area of its convex hull"""
     return (pol.area/pol.convex_hull.area)
 
 def rectangularity(pol):
+    """ 2D rectangularity measure.
+    Computed by dividing the area of a polygon by the area of the minimum rotated rectangle.
+    """
     return (pol.area/pol.minimum_rotated_rectangle.area)
 
 def pol_to_new_space(pol, feature_space=pol_features_coords, additional_functions=[convexity, rectangularity], metric='l1'):
@@ -224,6 +257,7 @@ def make_space(pol_list, features=pol_features_coords, additional_functions=[con
 
 def translate_pol(pol):
     # minx, miny, _, _ = pol.bounds
+    """Translates polygon such that the first coordinate is at (0, 0)"""
     xy = pol.exterior.coords[0]
     translate_x = -xy[0]
     translate_y = -xy[1]
@@ -231,9 +265,47 @@ def translate_pol(pol):
     return translated_pol
 
 def round_polygon(pol, decimals=1, simplify_tolerance=0.2):
+    """Rounds the coordinates of a polygon to the nearest tolerance and decimals."""
     pol = pol.simplify(tolerance=0.2)
     xx, yy = pol.exterior.coords.xy
     xx = np.round(xx.tolist(), decimals)
     yy = np.round(yy.tolist(), decimals)
     return shapely.Polygon(zip(xx, yy))
-    
+
+
+
+
+def process_to_features(filenames, geometry_features=feat_small, path="./", geometry_column='geometry', other_columns = ['bouwjaar', 'a_vb', 'a_vb_wf', 'a_p', 'c_area', 'maxz.max', 'h_dak_70p.max'], scaling=True, scaler=MinMaxScaler(), metric='l2', relative_feature_weight = False, categorical_columns = []):
+    ## One file provided:
+    """ Imports geopandas file with filename.
+    The geopandas-package should contain a geometry feature (name can be provided) with the 2D shape as a polygon.
+    Computes turning function for polygon and computes the minimal turning function distance to all the reference polygons in geometry_features.
+    Turns 
+    """
+    def file_to_df(filenames, geometry_features=feat_small, path="./", geometry_column='geometry', other_columns = ['bouwjaar', 'a_vb', 'a_vb_wf', 'a_p', 'c_area', 'maxz.max', 'h_dak_70p.max'], scaling=True, scaler=MinMaxScaler(), metric='l2', relative_feature_weight = False):
+        data = gpd.read_file(path+filenames)
+        pols = list(data[geometry_column])
+        if type(pols[0]) == shapely.geometry.MultiPolygon:
+            pols = [list(i.geoms)[0] for i in pols]
+        pols = [round_polygon(translate_pol(i)) for i in pols]
+        new_df = pd.DataFrame(make_space(pols, features=[pol_to_vec(i) for i in geometry_features], metric='l2'))
+        df_other = data[other_columns]
+        df_c = data[categorical_columns]
+        # df_c = 
+        if scaling:
+            df_other = scaler.fit_transform(df_other)
+        if relative_feature_weight:
+            df_other = np.multiply(df_other, np.sqrt(len(geometry_features)))
+        df_other = pd.DataFrame(df_other)
+        df = pd.concat([new_df.reset_index(drop=True), df_other.reset_index(drop=True)], axis=1)
+        return df, pols
+    if type(filenames) == type("hello"):
+        total_df, pols = file_to_df(filenames, geometry_features=geometry_features, path=path, geometry_column=geometry_column, other_columns=other_columns, scaling=scaling, scaler=scaler, metric=metric, relative_feature_weight=relative_feature_weight)
+    elif type(filenames) == type([1, 2, 3]) and filenames != []:
+        total_df, pols = file_to_df(filenames[0], geometry_features=geometry_features, path=path, geometry_column=geometry_column, other_columns=other_columns, scaling=scaling, scaler=scaler, metric=metric, relative_feature_weight=relative_feature_weight)
+        for fn in filenames[1:]:
+            new_df, new_pols = file_to_df(fn, geometry_features=geometry_features, path=path, geometry_column=geometry_column, other_columns=other_columns, scaling=scaling, scaler=scaler, metric=metric, relative_feature_weight=relative_feature_weight)
+            total_df = total_df.append(new_df, ignore_index=True)
+            pols = pols + new_pols
+    total_df.columns = list(range(len(total_df.columns)))
+    return total_df, pols
