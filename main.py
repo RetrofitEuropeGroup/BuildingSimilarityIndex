@@ -8,13 +8,15 @@ def run(all_ids: list):
     c.collect_id_list(all_ids)
 
     # Process the data
-    p = processing("collection/input")
+    # input_file = "C:\Users\TimoScheidel\OneDrive - HAN\Future Factory\FF_BuildingSimilarityIndex\analysis\subset20k.city.json"
+    # p = processing(input_file=input_file, output_file="subset20k.gpkg")
+    p = processing(gpkg_path="data/gpkg/test.gpkg", bag_data_folder="data/bag_data")
     p.run()
 
     # Calculate the similarity between the data
-    s = similarity(p.gpkg_path, ["roughness_index_3d", "actual_volume"])
-    dist = s.calculate_distance(all_ids[0], all_ids[1])
-    print(f"distance between '{all_ids[0]}' and '{all_ids[1]}': {dist}")
+    # s = similarity(p.gpkg_path, ["roughness_index_3d", "actual_volume"])
+    # dist = s.calculate_distance(all_ids[0], all_ids[1])
+    # print(f"distance between '{all_ids[0]}' and '{all_ids[1]}': {dist}")
 
 if __name__ == '__main__':
     # example of the use of run
