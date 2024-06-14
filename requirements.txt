@@ -20,5 +20,3 @@ pytest-cov
 cjio==0.9.0
 aiohttp
 requests==2.31.0 #TODO: add the version for the other packages
-sklearn
-math
