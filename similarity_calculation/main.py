@@ -251,5 +251,6 @@ if __name__ == '__main__':
     # sim = similarity(path, {'dispersion_index_2d': 1, 'dispersion_index_3d': 1})
     sim = similarity(path)
 
+    # TODO: might want to change output_path to a path in the data/metrics folder
     sim.distance_matrix_reference(gpkg_ref='analysis/voorbeeldwoningen.gpkg', output_path='analysis/distance_matrix_reference.csv')
     # gpdf = gpd.read_file(path)
