@@ -80,12 +80,10 @@ def save_filter_stats(outfiltered_2d, outfiltered_3d, output):
 
     # update the logger
     new_line = f'{output_name};{round(outfiltered_2d, 4)};{round(outfiltered_3d, 4)}\n'
-    if os.path.exists(logger_path):
-        with open(logger_path, 'a') as f:
-            f.write(new_line)
-    else:
+    if os.path.exists(logger_path) == False:
         with open(logger_path, 'w') as f:
             f.write('output_filename;filtered_2d;filtered_3d\n')
+    with open(logger_path, 'a') as f:
             f.write(new_line)
 
 
