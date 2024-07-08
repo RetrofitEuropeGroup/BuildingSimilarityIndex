@@ -1,9 +1,9 @@
 import numpy as np
 import shapely
 import math
+import pickle
 import geopandas as gpd
 import matplotlib.pyplot as plt
-import reference_polygons
 from shapely.affinity import translate
 from sklearn.preprocessing import MinMaxScaler
 
@@ -21,6 +21,8 @@ def load_pollist(filename, path="./"):
     with open(path+filename+".pkl", "rb") as f:
         plist = pickle.load(f)
     return plist
+
+
 
 def an(v1):
     """ Computes angle between vector and x-axis. """
@@ -43,6 +45,12 @@ def to_list(coords):
     Auxiliary function for computing the turning function."""
     length = len(coords)
     return [coords[i] for i in range(length)]
+
+
+# Polygon item naar lijst met coordinaten
+def pol_to_vec(poly):
+    return(to_list(poly.exterior.coords))
+
 
 # Rotatie van de lijst
 def rotate_list(alist, pos):
@@ -223,7 +231,7 @@ def minimize_dist(coords1, coords2, metric='l1', norm=True, tot_length=False):
 
 ## Reference polygons computed by doing 30 PCA loops of the feature space.
 ## POlygons were taken from both real complexes in The Netherlands and generated parameterized polygons.
-reference_shapes = load_pollist("30_ref_pols", path="reference_polygons/")
+reference_shapes = load_pollist("30_ref_pols", path="../reference_polygons/")
 reference_shapes_coords = [pol_to_vec(i) for i in reference_shapes]
 
 def convexity(pol):
@@ -273,16 +281,29 @@ def round_polygon(pol, decimals=1, simplify_tolerance=0.2):
     return shapely.Polygon(zip(xx, yy))
 
 
+def df_from_gpkg(filepath, geometry_features=feat_small, metric='l2', geometry_column='geometry'):
+    """ 
+    Places provided buildings in the provided feature space by computing the turning function distance to all reference polygons in the feature space.
+    """
+    data = gpd.read_file(filepath)
+    pols = [list(data[geometry_column])]
+    if type(pols[0]) == shapely.geometry.MultiPolygon:
+        pols = [list(i.geoms)[0] for i in pols]
+    pols = [round_polygon(translate_pol(i)) for i in pols]
+    df = pd.DataFrame(make_space(pols, features=[pol_to_vec(i) for i in geometry_features], metric=metric))
+    return df
 
 
-def process_to_features(filenames, geometry_features=feat_small, path="./", geometry_column='geometry', other_columns = ['bouwjaar', 'a_vb', 'a_vb_wf', 'a_p', 'c_area', 'maxz.max', 'h_dak_70p.max'], scaling=True, scaler=MinMaxScaler(), metric='l2', relative_feature_weight = False, categorical_columns = []):
+## other columns that are numerical:
+# 'bouwjaar', 'a_vb', 'a_vb_wf', 'a_p', 'c_area', 'maxz.max', 'h_dak_70p.max'
+def process_to_features(filenames, geometry_features=feat_small, path="./", geometry_column='geometry', other_columns = [], scaling=True, scaler=MinMaxScaler(), metric='l2', relative_feature_weight = False, categorical_columns = []):
     ## One file provided:
     """ Imports geopandas file with filename.
     The geopandas-package should contain a geometry feature (name can be provided) with the 2D shape as a polygon.
     Computes turning function for polygon and computes the minimal turning function distance to all the reference polygons in geometry_features.
     Turns 
     """
-    def file_to_df(filenames, geometry_features=feat_small, path="./", geometry_column='geometry', other_columns = ['bouwjaar', 'a_vb', 'a_vb_wf', 'a_p', 'c_area', 'maxz.max', 'h_dak_70p.max'], scaling=True, scaler=MinMaxScaler(), metric='l2', relative_feature_weight = False):
+    def file_to_df(filenames, geometry_features=feat_small, path="./", geometry_column='geometry', other_columns = [], scaling=True, scaler=MinMaxScaler(), metric='l2', relative_feature_weight = False):
         data = gpd.read_file(path+filenames)
         pols = list(data[geometry_column])
         if type(pols[0]) == shapely.geometry.MultiPolygon:
