@@ -25,13 +25,19 @@ class MergeCityJSON:
 
     def load_objects(self):
         all_objects = []
+        merge_count = 0
         for file in os.listdir(self.input_folder):
             if 'merged' in file:
-                print('Merged file found, should not be in the input folder. Skipping...')
+                merge_count += 1
                 continue
-            elif file.endswith('city.json') or file.endswith('city.jsonl'):
+            elif file.endswith('city.json'):
                 cm = CityJSON(open(f"{self.input_folder}/{file}", 'r'))
                 all_objects.append(cm)
+
+        if merge_count > 0:
+            print(f"""WARNING: {merge_count} merged file(s) found in the folder that you use for the merge of cityjson files
+                  , they are not included in the merge as they are already merged.""")
+
         self.all_objects = all_objects
 
     def prepare_output_folder(self):
@@ -47,36 +53,29 @@ class MergeCityJSON:
         self.prepare_output_folder()
 
         # create a name for the merged file
-        file_name = 'merged_1.city.json'
+        file_name = 'merged.city.json'
         while file_name in os.listdir(self.output_folder):
-            version_num = int(file_name.split('_')[1].split('.')[0])
-            file_name = f"merged ({version_num + 1}).city.json"
+            if file_name == 'merged.city.json': # merged.city.json already exists, try one with a version number
+                version_num = 0
+            else:
+                version_num = int(file_name.split('_')[1].split('.')[0])
+            file_name = f"merged_{version_num + 1}.city.json"
         self.file_name = file_name
 
     def save(self):
-        with open(f"{self.output_folder}/{self.file_name}", 'w') as f:
+        self.file_path = f"{self.output_folder}/{self.file_name}"
+        with open(self.file_path, 'w') as f:
             json.dump(self.merged_obj, f)
-
-# def rename_files(input_folder):
-#     # rename files to the correct format
-#     for file in os.listdir(input_folder):
-#         if not file.endswith('city.json') and file.endswith('.json'):
-#             os.rename('input/' + file, 'input/' + file[:-5] + '.city.json')
-
 
     def run(self):
         # load & merge
         self.load_objects()
         self.merge_objects()
-        print(len(self.merged_obj))
-        print(len(self.all_objects))
         
         # save the merged object
         self.create_output_name()
         self.save()
 
-
 if __name__ == '__main__':
     merger = MergeCityJSON(r'input_folder', 'test_output')
     merger.run()
-    
