@@ -84,7 +84,7 @@ def save_filter_stats(outfiltered_2d, outfiltered_3d, output):
         with open(logger_path, 'w') as f:
             f.write('output_filename;filtered_2d;filtered_3d\n')
     with open(logger_path, 'a') as f:
-            f.write(new_line)
+        f.write(new_line)
 
 
 def clean_df(df, output):
