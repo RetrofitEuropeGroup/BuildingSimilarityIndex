@@ -45,7 +45,7 @@ class processing():
     def initiate_gpkg(self):
         """ Initiates the .gpkg path with the 2d and 3d metrics"""
         # determine the number of processors to use and where the cityStats.py file is located
-        n_processors = os.cpu_count() - 2
+        n_processors = os.cpu_count() - 1
         if os.getcwd().endswith('processing'):
             city_stats_location =  "metrics/cityStats.py"
         else:
@@ -68,7 +68,7 @@ class processing():
 
 
 if __name__ == '__main__':
-    p = processing(gpkg_path="data/gpkg/test.gpkg", bag_data_folder="data/bag_data")
+    p = processing(gpkg_path="data/gpkg/testcase_overvecht.gpkg", bag_data_folder="data/bag_data")
     # p = processing(cityjson_path="analysis/voorbeeldwoningen.city.json", gpkg_path="collection/output/output.gpkg")
     p.run()
     import geopandas as gpd

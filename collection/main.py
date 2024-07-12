@@ -62,10 +62,13 @@ class collection():
             self.save(cityjson, all_ids[i])
 
 if __name__ == "__main__":
-    all_ids = ["0153100000203775", "0153100000277229", "0772100000262212",
-               "0153100000213600", "0327100000255061", "0327100000258432",
-                "0327100000252015", "0327100000264673", "0307100000377568",
-                "0307100000326243", "0307100000337962", "0402100001519973"]
+    import geopandas as gpd
+    df = gpd.read_file("testcase_overvecht/BSI_overvecht.gpkg", layer='pand')
+    all_ids = df['identificatie'].tolist()
 
-    c = collection()
-    c.collect_id_list(all_ids)
+    start_id = 0
+    step = 100
+    for i in range(start_id, len(all_ids), step):
+        c = collection()
+        c.collect_id_list(all_ids[i:i+step])
+        print(f'Processed building {i} to {i+step} out of total {len(all_ids)} buildings')
