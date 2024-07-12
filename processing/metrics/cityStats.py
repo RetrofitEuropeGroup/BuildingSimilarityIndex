@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 import geopandas
 import pyvista as pv
-import rtree.index
 import scipy.spatial as ss
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
