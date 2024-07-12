@@ -14,8 +14,8 @@ def run(all_ids: list):
     p.run()
 
     # Calculate the similarity between the data
-    # s = similarity(p.gpkg_path, ["roughness_index_3d", "actual_volume"])
-    # dist = s.calculate_distance(all_ids[0], all_ids[1])
+    s = similarity(p.gpkg_path, columns= ["roughness_index_3d", "actual_volume"])
+    dist = s.calculate_distance(all_ids[0], all_ids[1])
     # print(f"distance between '{all_ids[0]}' and '{all_ids[1]}': {dist}")
 
 if __name__ == '__main__':
