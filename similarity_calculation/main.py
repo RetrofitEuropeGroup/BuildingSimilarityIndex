@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from sklearn.metrics.pairwise import euclidean_distances
 
+
+# TODO: split this up into multiple files
+
 class similarity:
     def __init__(self, gpkg_path: str, column_weights: dict = None, columns: list = None):
         self._validate_input(column_weights, columns)
