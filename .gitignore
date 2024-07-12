@@ -7,3 +7,4 @@ data/*
 val3dity.log
 *.py~
 analysis/*
+# TODO: make sure data folder is created on git clone
