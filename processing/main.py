@@ -15,11 +15,11 @@ class processing():
             raise ValueError("Either input_folder or cityjson_path should be provided")
         elif bag_data_folder is not None and cityjson_path is not None:
             raise ValueError("It is not possible to use both bag_data_folder and cityjson_path")
-        
+
         self.bag_data_folder = bag_data_folder
         self.cityjson_path = cityjson_path
         self.validate_gpkg_path(gpkg_path)
-        
+
 
     def validate_gpkg_path(self, file_path: str):
         if isinstance(file_path, str) == False:
@@ -45,7 +45,7 @@ class processing():
     def initiate_gpkg(self):
         """ Initiates the .gpkg path with the 2d and 3d metrics"""
         # determine the number of processors to use and where the cityStats.py file is located
-        n_processors = os.cpu_count() - 1
+        n_processors = min(os.cpu_count() - 1, 1)
         if os.getcwd().endswith('processing'):
             city_stats_location =  "metrics/cityStats.py"
         else:
