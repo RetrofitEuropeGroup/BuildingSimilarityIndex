@@ -46,10 +46,6 @@ class processing():
         """ Initiates the .gpkg path with the 2d and 3d metrics"""
         # determine the number of processors to use and where the cityStats.py file is located
         n_processors = max(os.cpu_count() - 1, 1)
-        if os.getcwd().endswith('processing'):
-            city_stats_location =  "metrics/cityStats.py"
-        else:
-            city_stats_location =  "processing/metrics/cityStats.py"
 
         # run the citystats script
         process_cityjson(self.cityjson_path, self.gpkg_path, jobs=n_processors)
