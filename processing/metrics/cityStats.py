@@ -3,8 +3,6 @@ import os
 import math
 import subprocess
 
-import click
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import geopandas
@@ -13,9 +11,10 @@ import scipy.spatial as ss
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-import cityjson
-import geometry
-import shape_index as si
+
+import metrics.cityjson as cityjson
+import metrics.geometry as geometry
+import metrics.shape_index as si
 
 def compute_stats(values, percentile = 90, percentage = 75):
     """
@@ -87,7 +86,7 @@ def save_filter_stats(outfiltered_2d, outfiltered_3d, output):
 
 
 def clean_df(df, output):
-    """Cleans the dataframe, it removes the buildings with errors, 
+    """Cleans the dataframe, it removes the buildings with errors,
     holes, and buildings with index values out of the normal range."""
     ## filter based on some conditions
     # filter out the buldings with actual_volume lower than 40, no holes
@@ -133,7 +132,7 @@ def eligible(cm, id, report):
     """Returns True if the building is eligible for processing"""
     if report == {}:
         return True
-    
+
     errors = get_errors_from_report(report, id, cm)
     if errors:
         return False
@@ -174,7 +173,7 @@ def get_report(input):
             report = open(val3dity_report, "rb")
         except Exception as e:
             report = {}
-            print(f"Warning: Could not run val3dity, continuing without report")        
+            print(f"Warning: Could not run val3dity, continuing without report")
     return report
 
 class StatValuesBuilder:
@@ -283,7 +282,7 @@ def process_building(building,
         "geometry": shape,
     }
 
-    
+
     voxel = pv.voxelize(tri_mesh, density=density_3d, check_surface=False)
     grid = voxel.cell_centers().points
 
@@ -326,35 +325,26 @@ def process_building(building,
 
 
 # Assume semantic surfaces
-@click.command()
-@click.argument("input", type=click.File("rb"))
-@click.option('-o', '--output')
-@click.option('-f', '--filter')
-@click.option('-r', '--repair', flag_value=True)
-@click.option('-p', '--plot-buildings', flag_value=True)
-@click.option('--without-indices', flag_value=True)
-@click.option('-j', '--jobs', default=1)
-@click.option('--density-2d', default=1.0)
-@click.option('--density-3d', default=1.0)
-def main(input,
+def process_cityjson(input,
          output,
-         filter,
-         repair,
-         plot_buildings,
-         without_indices,
-         jobs,
-         density_2d,
-         density_3d):
+         filter=None,
+         repair=False,
+         plot_buildings=False,
+         without_indices=False,
+         jobs=1,
+         density_2d=1.0,
+         density_3d=1.0):
 
-    cm = json.load(input)
+    with open(input, "r") as input:
+        cm = json.load(input)
 
-    # if no output file is provided, use the name of the input file. But in the output folder
-    if output is None:
-        output = input.name[:-5] + ".csv"
-        output = output.replace('input', 'output')
+        # if no output file is provided, use the name of the input file. But in the output folder
+        if output is None:
+            output = input.name[:-5] + ".csv"
+            output = output.replace('input', 'output')
 
-    # create and open the report
-    report = get_report(input)
+        # create and open the report
+        report = get_report(input)
 
     if "transform" in cm:
         s = cm["transform"]["scale"]
@@ -418,7 +408,7 @@ def main(input,
     except Exception as e:
         print(f"ERROR: Problem with cleaning the dataframe: {e}")
         clean = df
-    
+
     try:
         if output.endswith(".csv"):
             clean.to_csv(output)
@@ -435,4 +425,4 @@ def main(input,
         os.remove('val3dity.log')
 
 if __name__ == "__main__":
-    main()
+    process_cityjson("data/bag_data_merged/merged_1.city.json", output= "./data/gpkg/test.gpkg")

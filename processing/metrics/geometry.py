@@ -2,7 +2,7 @@
 
 import numpy as np
 import pyvista as pv
-from helpers.geometry import plane_params, project_mesh, to_3d
+from metrics.helpers.geometry import plane_params, project_mesh, to_3d
 from scipy.spatial import distance_matrix
 from sklearn.cluster import AgglomerativeClustering
 
@@ -11,7 +11,7 @@ def get_points_of_type(mesh, surface_type):
 
     if not "semantics" in mesh.cell_data:
         return []
-    
+
     idxs = [s == surface_type for s in mesh.cell_data["semantics"]]
 
     points = np.array([mesh.cell_points(i) for i in range(mesh.number_of_cells)], dtype=object)
@@ -42,9 +42,9 @@ def extrude(shape, min, max):
     pts = mesh.points
     t = np.mean(pts, axis=0)
     mesh.points = mesh.points - t
-    
+
     mesh = mesh.extrude([0.0, 0.0, max - min], capping=True)
-    
+
     # Transform back to origina coords
     # mesh.points = mesh.points + t
 
@@ -92,7 +92,7 @@ def area_by_surface(mesh, tri_mesh=None):
 
             point_count[surface_type] = sum(points_per_cell[face_idxs])
             surface_count[surface_type] = sum(face_idxs)
-    
+
     return area, point_count, surface_count
 
 def face_planes(mesh):
@@ -103,26 +103,26 @@ def face_planes(mesh):
 
 def cluster_meshes(meshes, threshold=0.1):
     """Clusters the faces of the given meshes"""
-    
+
     n_meshes = len(meshes)
-    
+
     # Compute the "absolute" plane params for every face of the two meshes
     planes = [face_planes(mesh) for mesh in meshes]
     mesh_ids = [[m for _ in range(meshes[m].n_cells)] for m in range(n_meshes)]
-    
+
     # Find the common planes between the two faces
     all_planes = np.concatenate(planes)
     all_labels, n_clusters = cluster_faces(all_planes, threshold)
     areas = []
-    
+
     labels = np.array_split(all_labels, [meshes[m].n_cells for m in range(n_meshes - 1)])
-    
+
     return labels, n_clusters
 
 def cluster_faces(data, threshold=0.1):
     """Clusters the given planes"""
     ndata = np.array(data)
-    
+
     dm1 = distance_matrix(ndata, ndata)
     dm2 = distance_matrix(ndata, -ndata)
 
@@ -132,7 +132,7 @@ def cluster_faces(data, threshold=0.1):
                                          distance_threshold=threshold,
                                          affinity='precomputed',
                                          linkage='average').fit(dist_mat)
-    
+
     return clustering.labels_, clustering.n_clusters_
 
 def intersect_surfaces(meshes):
@@ -156,34 +156,34 @@ def intersect_surfaces(meshes):
         # polygon without holes:
         elif geom.boundary.type == 'LineString':
             get_area_from_ring(areas, geom.area, geom.boundary, normal, origin)
-    
+
     n_meshes = len(meshes)
-    
+
     areas = []
-    
+
     labels, n_clusters = cluster_meshes(meshes)
-    
+
     for plane in range(n_clusters):
         # For every common plane, extract the faces that belong to it
         idxs = [[i for i, p in enumerate(labels[m]) if p == plane] for m in range(n_meshes)]
-                
+
         if any([len(idx) == 0 for idx in idxs]):
             continue
-        
+
         msurfaces = [mesh.extract_cells(idxs[i]).extract_surface() for i, mesh in enumerate(meshes)]
-                
+
         # Set the normal and origin point for a plane to project the faces
         origin = msurfaces[0].clean().points[0]
         normal = msurfaces[0].face_normals[0]
-        
+
         # Create the two 2D polygons by projecting the faces
         polys = [project_mesh(msurface, normal, origin) for msurface in msurfaces]
-        
+
         # Intersect the 2D polygons
         inter = polys[0]
         for i in range(1, len(polys)):
             inter = inter.intersection(polys[i])
-        
+
         if inter.area > 0.001:
             if inter.type == "MultiPolygon" or inter.type == "GeometryCollection":
                 for geom in inter.geoms:
@@ -192,5 +192,5 @@ def intersect_surfaces(meshes):
                     get_area_from_polygon(areas, geom, normal, origin)
             elif inter.type == "Polygon":
                 get_area_from_polygon(areas, inter, normal, origin)
-    
+
     return areas

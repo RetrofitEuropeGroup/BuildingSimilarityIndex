@@ -8,6 +8,7 @@ from pathlib import Path
 parent_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_dir)
 from processing.merge_cityjson import MergeCityJSON
+from processing.metrics.cityStats import process_cityjson
 
 class processing():
     def __init__(self, gpkg_path: str, bag_data_folder: str = None, cityjson_path: str = None):
@@ -52,8 +53,7 @@ class processing():
             city_stats_location =  "processing/metrics/cityStats.py"
 
         # run the citystats script
-        command = f'python {city_stats_location} {self.cityjson_path} -j {n_processors} -o {self.gpkg_path}'
-        os.system(command)
+        process_cityjson(self.cityjson_path, self.gpkg_path, jobs=n_processors)
 
     def run(self):
         # merge if not a single file has been provided
