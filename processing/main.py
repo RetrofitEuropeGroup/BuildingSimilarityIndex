@@ -2,13 +2,12 @@ import os
 import sys
 from pathlib import Path
 
-# if we run the script from the processing folder, we need to add the parent folder to the path
-# otherwise it won't search for processing.merge_cityjson in the root folder of the repository
-# this is useful for testing
-parent_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-sys.path.append(parent_dir)
-from processing.merge_cityjson import MergeCityJSON
-from processing.metrics.cityStats import process_cityjson
+# add the path of the own directory to the system path so that the modules can be imported
+file_dir = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(file_dir)
+
+from merge_cityjson import MergeCityJSON
+from metrics.cityStats import process_cityjson
 
 class processing():
     def __init__(self, gpkg_path: str, bag_data_folder: str = None, cityjson_path: str = None):

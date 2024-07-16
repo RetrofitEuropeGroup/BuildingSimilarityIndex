@@ -2,10 +2,10 @@
 
 import math
 from shapely.geometry import Point, MultiPoint, Polygon
-from metrics.helpers.geometry import surface_normal
-from metrics.helpers.smallestenclosingcircle import make_circle
+from helpers.geometry import surface_normal
+from helpers.smallestenclosingcircle import make_circle
 try:
-    from metrics.helpers.mesh import to_pymesh, to_pyvista, intersect
+    from helpers.mesh import to_pymesh, to_pyvista, intersect
     pymesh_exists = True
 except:
     # print("WARNING: pymesh not found! Exchange index calculation will be omitted...")
