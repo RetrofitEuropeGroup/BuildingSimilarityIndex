@@ -27,7 +27,10 @@ python main.py
 
 ## Installation
 
-### Clone the library & install requirements
+### Install the val3dity libary (Windows). 
+You can follow the instructions here or go to the [val3dity repo](https://github.com/tudelft3d/val3dity). However, you have to make sure that the executable is working and in the processing/metrics/val3dity directory so it is recommended to follow this instruction. 
+
+1. Clone the repo & install dependencies
 
 ```bash
 git clone https://github.com/RetrofitEuropeGroup/FF_BuildingSimilarityIndex.git
@@ -35,13 +38,10 @@ cd FF_BuildingSimilarityIndex
 pip install -r requirements.txt
 ```
 
-### Install the val3dity libary (Windows). 
-You can follow the instructions here or go to the [val3dity repo](https://github.com/tudelft3d/val3dity). However, you have to make sure that the executable is working and in the processing/metrics/val3dity directory so it is recommended to follow this instruction. 
-
-1. [Download](https://github.com/tudelft3d/val3dity/releases/download/2.4.0/val3dity-win64-v240.zip) the val3dity exectuable from their github page
-2. Unzip val3dity-win64-v240
-3. Unzip val3dity-win64
-4. Copy all the files from the unzipped directory <i>val3dity-win64</i> to this specific place in the repo: <i>processing/metrics/val3dity</i>
+2. [Download](https://github.com/tudelft3d/val3dity/releases/download/2.4.0/val3dity-win64-v240.zip) the val3dity exectuable from their github page
+3. Unzip val3dity-win64-v240
+4. Unzip val3dity-win64
+5. Copy all the files from the unzipped directory <i>val3dity-win64</i> to this specific place in the repo: <i>processing/metrics/val3dity</i>
 
 
 ### Install the val3dity library (Linux - Ubuntu 22.04)
@@ -53,12 +53,21 @@ sudo apt-get update
 sudo apt-get install libxrender1 cmake g++ git libboost-all-dev
 ````
 
-Make 
+Create the CMAKE package.
 ```bash
-mkdir build
-cd build
+git clone https://github.com/tudelft3d/val3dity.git
+mkdir val3dity/build
+cd val3dity/build
 cmake ..
 make
+cd ../..
+```
+
+Clone the repo & install dependencies, assuming the working directory of your terminal is still 
+```bash
+git clone https://github.com/RetrofitEuropeGroup/FF_BuildingSimilarityIndex.git
+cd FF_BuildingSimilarityIndex
+pip install -r requirements.txt
 ```
 
 
