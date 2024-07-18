@@ -162,18 +162,17 @@ def get_parent_attributes(cm, obj):
 def get_report(input):
     # create the val3dity report with the same name as the input file
     val3dity_report = f"{input.name[:-5]}_report.json"
-    # determine the location of the val3dity command
-    # TODO: this can just be 1 line right? No need to check if it's in processing or not
-    if 'processing' in os.getcwd():
-        val3dity_cmd_location = os.path.join(os.getcwd(), 'metrics/val3dity/val3dity')
-    else:
-        # val3dity_cmd_location = os.path.join(os.getcwd(), 'processing/metrics/val3dity/val3dity')
-        val3dity_cmd_location = './processing/metrics/val3dity/val3dity'
+    
+    
 
     if os.path.exists(val3dity_report):
         report = open(val3dity_report, "rb")
     else:
         try:
+            # determine the location of the val3dity executable
+            file_dir = os.path.dirname(os.path.realpath(__file__))
+            val3dity_cmd_location = os.path.join(file_dir, 'val3dity/val3dity')
+
             # TODO: make sure the val3dity folder is arranged correctly
             # TODO: make this subprocess again so that the output is not printed
             os.system(f'{val3dity_cmd_location} {input.name} -r {val3dity_report}')
