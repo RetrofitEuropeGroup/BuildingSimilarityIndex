@@ -167,17 +167,21 @@ def get_report(input):
     if 'processing' in os.getcwd():
         val3dity_cmd_location = os.path.join(os.getcwd(), 'metrics/val3dity/val3dity')
     else:
-        val3dity_cmd_location = os.path.join(os.getcwd(), 'processing/metrics/val3dity/val3dity')
+        # val3dity_cmd_location = os.path.join(os.getcwd(), 'processing/metrics/val3dity/val3dity')
+        val3dity_cmd_location = './processing/metrics/val3dity/val3dity'
 
     if os.path.exists(val3dity_report):
         report = open(val3dity_report, "rb")
     else:
         try:
-            subprocess.check_output(f'{val3dity_cmd_location} {input.name} -r {val3dity_report}')
+            # TODO: make sure the val3dity folder is arranged correctly
+            # TODO: make this subprocess again so that the output is not printed
+            os.system(f'{val3dity_cmd_location} {input.name} -r {val3dity_report}')
+            # subprocess.check_output(f'{val3dity_cmd_location} {input.name} -r {val3dity_report}')
             report = open(val3dity_report, "rb")
         except Exception as e:
             report = {}
-            print(f"Warning: Could not run val3dity, continuing without report")
+            print(f"Warning: Could not run val3dity, continuing without report. Message: {e}")
     return report
 
 class StatValuesBuilder:
