@@ -47,14 +47,14 @@ pip install -r requirements.txt
 ### Linux (Ubuntu 22.04)
 You can follow the instructions here or go to the val3dity repo page. However, you have to make sure that the package is working and in the processing/metrics/val3dity directory so it is recommended to follow this instruction. <br></br>
 
-Start to install the required packages. They are needed in order for the pyvista library & val3dity
+1. Start to install the required packages. They are needed in order for the pyvista library & val3dity
 ```bash
 sudo apt-get update
 sudo apt-get install libxrender1 cmake g++ git libboost-all-dev libeigen3-dev libgeos++-dev libcgal-dev libgl1
 ````
 
 
-Create the CMAKE package
+2. Create the CMAKE package
 ```bash
 git clone https://github.com/tudelft3d/val3dity.git
 mkdir val3dity/build
@@ -64,7 +64,7 @@ make
 cd ../..
 ```
 
-Clone the repo, copy the cmake package into the repo & install dependencies
+3. Clone the repo, copy the cmake package into the repo & install dependencies
 ```bash
 git clone https://github.com/RetrofitEuropeGroup/FF_BuildingSimilarityIndex.git
 mkdir FF_BuildingSimilarityIndex/processing/metrics/val3dity
