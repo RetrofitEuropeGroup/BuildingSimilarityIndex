@@ -27,8 +27,8 @@ python main.py
 
 ## Installation
 
-### Install the val3dity libary (Windows). 
-You can follow the instructions here or go to the [val3dity repo](https://github.com/tudelft3d/val3dity). However, you have to make sure that the executable is working and in the processing/metrics/val3dity directory so it is recommended to follow this instruction. 
+### Windows
+You can follow the instructions here or go to the [val3dity repo](https://github.com/tudelft3d/val3dity). However, you have to make sure that the executable is working and in the processing/metrics/val3dity directory so it is recommended to follow this instruction. <br></br>
 
 1. Clone the repo & install dependencies
 
@@ -44,16 +44,17 @@ pip install -r requirements.txt
 5. Copy all the files from the unzipped directory <i>val3dity-win64</i> to this specific place in the repo: <i>processing/metrics/val3dity</i>
 
 
-### Install the val3dity library (Linux - Ubuntu 22.04)
-You can follow the instructions here or go to the val3dity repo page. However, you have to make sure that the package is working and in the processing/metrics/val3dity directory so it is recommended to follow this instruction. 
+### Linux (Ubuntu 22.04)
+You can follow the instructions here or go to the val3dity repo page. However, you have to make sure that the package is working and in the processing/metrics/val3dity directory so it is recommended to follow this instruction. <br></br>
 
 Start to install the required packages. They are needed in order for the pyvista library & val3dity
 ```bash
 sudo apt-get update
-sudo apt-get install libxrender1 cmake g++ git libboost-all-dev
+sudo apt-get install libxrender1 cmake g++ git libboost-all-dev libeigen3-dev libgeos++-dev libcgal-dev libgl1
 ````
 
-Create the CMAKE package.
+
+Create the CMAKE package
 ```bash
 git clone https://github.com/tudelft3d/val3dity.git
 mkdir val3dity/build
@@ -63,21 +64,17 @@ make
 cd ../..
 ```
 
-Clone the repo & install dependencies, assuming the working directory of your terminal is still 
+Clone the repo, copy the cmake package into the repo & install dependencies
 ```bash
 git clone https://github.com/RetrofitEuropeGroup/FF_BuildingSimilarityIndex.git
+mkdir FF_BuildingSimilarityIndex/processing/metrics/val3dity
+cp val3dity/build/val3dity FF_BuildingSimilarityIndex/processing/metrics/val3dity/val3dity
 cd FF_BuildingSimilarityIndex
 pip install -r requirements.txt
 ```
 
 
-## Author
-
-* Github: [@RetrofitEuropeGroup](https://github.com/RetrofitEuropeGroup)
 
 ## Show your support
 
 Give a ⭐️ if this project helped you!
-
-***
-_This README was generated with ❤️ by [readme-md-generator](https://github.com/kefranabg/readme-md-generator)_
