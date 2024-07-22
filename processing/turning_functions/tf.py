@@ -1,26 +1,36 @@
-import numpy as np
+import os
 import shapely
-import math
 import geopandas as gpd
-import matplotlib.pyplot as plt
-import reference_polygons
+
+import pandas as pd
+import numpy as np
+import geopandas as gpd
+
 from shapely.affinity import translate
 from sklearn.preprocessing import MinMaxScaler
 
+pol_features_coords = None
 
-def save_pollist(plist, filename, path="./"):
-    """ Saves a list of polygons as pickle format. Creates path if it does not exist.""" 
+## Reference polygons computed by doing 30 PCA loops of the feature space.
+## Polygons were taken from both real complexes in The Netherlands and generated parameterized polygons.
+def save_pollist(pollist, file_path):
+    """ Saves a list of polygons as geopackage format. Creates path if it does not exist."""
+    path = os.path.dirname(file_path)
     if not(os.path.exists(path)):
         os.makedirs(path)
-    with open(path+filename+".pkl", "wb") as f:
-        pickle.dump(plist, f)
+
+    df = gpd.GeoDataFrame(geometry=pollist)
+    driver="GPKG"
+    df.to_file(os.path.join(file_path), driver=driver)
 
 
-def load_pollist(filename, path="./"):
-    """ Loads a list of polygons from a pickle file."""
-    with open(path+filename+".pkl", "rb") as f:
-        plist = pickle.load(f)
-    return plist
+def pol_to_vec(pol):
+    """Converts a shapely polygon to a list of coordinates."""
+    return [list(i) for i in pol.exterior.coords]
+
+file_dir = os.path.dirname(os.path.realpath(__file__))
+reference_shapes = gpd.read_file(os.path.join(file_dir, "reference_polygons", "30_ref_pols.gpkg"))
+reference_shapes_coords = [pol_to_vec(i) for i in reference_shapes.geometry]
 
 def an(v1):
     """ Computes angle between vector and x-axis. """
@@ -29,7 +39,7 @@ def an(v1):
         return np.arccos(v1[0])
     else:
         return 2*np.pi - np.arccos(v1[0])
-    
+
 ## Therefore, given normalized vector:
 def angle(v1,v2):
     """Angle between two vectors """
@@ -39,7 +49,7 @@ def angle(v1,v2):
 ### Utils
 # Conversie coordinaten naar lijst
 def to_list(coords):
-    """Converts coordinates of shapely.polygons, consisting of two separate large lists of x coords and y coords, into a list of (x, y) coords.
+    """Converts coordinates of shapely.geometry.polygons, consisting of two separate large lists of x coords and y coords, into a list of (x, y) coords.
     Auxiliary function for computing the turning function."""
     length = len(coords)
     return [coords[i] for i in range(length)]
@@ -59,7 +69,7 @@ def update_geo(geometry):
     first_coord = geo_coords[0]
     for i in range(len(geo_coords)):
         geo_coords[i]=np.subtract(geo_coords[i],first_coord)
-    return shapely.Polygon(geo_coords)
+    return shapely.geometry.Polygon(geo_coords)
 
 ### Functions for calculating turning functions and distances
 def truncate_angle(an):
@@ -69,7 +79,7 @@ def truncate_angle(an):
         an = 2*np.pi - an
     return an
 
-# Transforming the coord vectors into pairs of vectors corresponding with the normalized cumulative length and corresponding cumulative angle, 
+# Transforming the coord vectors into pairs of vectors corresponding with the normalized cumulative length and corresponding cumulative angle,
 # and the total length of the vector
 def get_turning(coords_list, norm = True, tot_length = False):
     """ Get turning function from list of polygon coordinates.
@@ -137,7 +147,7 @@ def matching_lengths(v1,v2):
 def compare_turning(vec1,vec2,metric='l1'):
     """ Compare turning: computes distance metric between two turning functions. Assumes both turning functions have the same length/number of break points.
     Optional argument:
-    metric: 'l1' or 'l2'. 
+    metric: 'l1' or 'l2'.
 
     Computes:
     $[\int_{0}^{1} (\phi_1(s) - \ph_2(s) )^{l} ds ]^{1/l}$
@@ -170,8 +180,8 @@ def dist_coords2(tf1, tf2, metric='l1'):
 
 
 def rotate_tf(tf):
-    """Rotate_tf: 
-    Computes new turning function from old turning function by starting at the next initial point. 
+    """Rotate_tf:
+    Computes new turning function from old turning function by starting at the next initial point.
     i.e. this corresponds to rotating the polygon by one vertex and computing the turning function"""
     x = tf[0]
     y = tf[1]
@@ -185,7 +195,7 @@ def rotate_tf(tf):
     return (xnew, np.array(list(map(make_pos, ynew))))
 
 def rotate_until_corner(tf):
-    """ Rotates turning function until a large angle is encountered if any large angles exist. 
+    """ Rotates turning function until a large angle is encountered if any large angles exist.
     Taking large angles as initial points helps with filtering out inaccuracies existing in the data imported from BAG.
     """
     c = 0
@@ -221,10 +231,6 @@ def minimize_dist(coords1, coords2, metric='l1', norm=True, tot_length=False):
         dist = np.amin([dist, d, d2])
     return dist
 
-## Reference polygons computed by doing 30 PCA loops of the feature space.
-## POlygons were taken from both real complexes in The Netherlands and generated parameterized polygons.
-reference_shapes = load_pollist("30_ref_pols", path="reference_polygons/")
-reference_shapes_coords = [pol_to_vec(i) for i in reference_shapes]
 
 def convexity(pol):
     """ 2D convexity measure.
@@ -238,9 +244,9 @@ def rectangularity(pol):
     return (pol.area/pol.minimum_rotated_rectangle.area)
 
 def pol_to_new_space(pol, feature_space=pol_features_coords, additional_functions=[convexity, rectangularity], metric='l1'):
-    """Pol_to_new_space: pol(shapely.polygon), feature_space(list(shapely.polygon)), additional_functions(list(lambda(shapely.pol) -> float)), metric: string
-    Takes a polygon and computes the turning function distance to the set of reference polygons provided in 'feature_space'. 
-    Other indices/features can be provided in 'additional_functions' in the form of a function mapping a shapely.polygon to a float.
+    """Pol_to_new_space: pol(shapely.geometry.polygon), feature_space(list(shapely.geometry.polygon)), additional_functions(list(lambda(shapely.pol) -> float)), metric: string
+    Takes a polygon and computes the turning function distance to the set of reference polygons provided in 'feature_space'.
+    Other indices/features can be provided in 'additional_functions' in the form of a function mapping a shapely.geometry.polygon to a float.
     By default, adds convexity and rectangularity."""
     pol_coords = to_list(pol.exterior.coords)
     return np.array([minimize_dist(pol_coords, feature_space[i], metric=metric) for i in range(len(feature_space))]+[i(pol) for i in additional_functions])
@@ -249,7 +255,7 @@ def make_space(pol_list, features=pol_features_coords, additional_functions=[con
     """make_space: constructs feature space from list of polygons. See pol_to_new_space for details on how each instance is transformed to the feature space."""
     res = np.zeros((len(pol_list),len(features)))
     for i in range(len(pol_list)):
-        res[i,:] = pol_to_new_space(pol_list[i], feature_space=features, additional_functions=[convexity, rectangularity], metric=metric)
+        res[i,:] = pol_to_new_space(pol_list[i], feature_space=features, additional_functions=additional_functions, metric=metric)
         if i%10 == 0:
             print("Working on pol {0}".format(i))
     return res
@@ -270,42 +276,66 @@ def round_polygon(pol, decimals=1, simplify_tolerance=0.2):
     xx, yy = pol.exterior.coords.xy
     xx = np.round(xx.tolist(), decimals)
     yy = np.round(yy.tolist(), decimals)
-    return shapely.Polygon(zip(xx, yy))
+    return shapely.geometry.Polygon(zip(xx, yy))
 
 
+def process_to_features(filepath, 
+                        geometry_features,
+                        geometry_column='geometry',
+                        other_columns = ['bouwjaar', 'a_vb', 'a_vb_wf', 'a_p', 'c_area', 'maxz.max', 'h_dak_70p.max'],
+                        scaling=True,
+                        scaler=MinMaxScaler(),
+                        metric='l2',
+                        relative_feature_weight = False,
+                        categorical_columns = []):
 
-
-def process_to_features(filenames, geometry_features=feat_small, path="./", geometry_column='geometry', other_columns = ['bouwjaar', 'a_vb', 'a_vb_wf', 'a_p', 'c_area', 'maxz.max', 'h_dak_70p.max'], scaling=True, scaler=MinMaxScaler(), metric='l2', relative_feature_weight = False, categorical_columns = []):
     ## One file provided:
-    """ Imports geopandas file with filename.
+    """ Imports geopandas file with filepath.
     The geopandas-package should contain a geometry feature (name can be provided) with the 2D shape as a polygon.
     Computes turning function for polygon and computes the minimal turning function distance to all the reference polygons in geometry_features.
-    Turns 
     """
-    def file_to_df(filenames, geometry_features=feat_small, path="./", geometry_column='geometry', other_columns = ['bouwjaar', 'a_vb', 'a_vb_wf', 'a_p', 'c_area', 'maxz.max', 'h_dak_70p.max'], scaling=True, scaler=MinMaxScaler(), metric='l2', relative_feature_weight = False):
-        data = gpd.read_file(path+filenames)
+    def filepath_to_df(filepath, geometry_features, geometry_column='geometry', other_columns = ['bouwjaar', 'a_vb', 'a_vb_wf', 'a_p', 'c_area', 'maxz.max', 'h_dak_70p.max'], scaling=True, scaler=MinMaxScaler(), metric='l2', relative_feature_weight = False):
+        data = gpd.read_file(filepath)
         pols = list(data[geometry_column])
         if type(pols[0]) == shapely.geometry.MultiPolygon:
             pols = [list(i.geoms)[0] for i in pols]
         pols = [round_polygon(translate_pol(i)) for i in pols]
-        new_df = pd.DataFrame(make_space(pols, features=[pol_to_vec(i) for i in geometry_features], metric='l2'))
+        new_df = pd.DataFrame(make_space(pols, features=[pol_to_vec(i) for i in geometry_features], metric='l2', additional_functions=[]))
         df_other = data[other_columns]
         df_c = data[categorical_columns]
-        # df_c = 
-        if scaling:
-            df_other = scaler.fit_transform(df_other)
-        if relative_feature_weight:
-            df_other = np.multiply(df_other, np.sqrt(len(geometry_features)))
+        # df_c =
+
+
+        # Timo - I think the following code is not necessary. The data will be scaled in the similarity_calculation module. Doing that would keep everything in the relevant module
+        # if scaling:
+        #     df_other = scaler.fit_transform(df_other)
+        # if relative_feature_weight:
+        #     df_other = np.multiply(df_other, np.sqrt(len(geometry_features)))
+
         df_other = pd.DataFrame(df_other)
         df = pd.concat([new_df.reset_index(drop=True), df_other.reset_index(drop=True)], axis=1)
         return df, pols
-    if type(filenames) == type("hello"):
-        total_df, pols = file_to_df(filenames, geometry_features=geometry_features, path=path, geometry_column=geometry_column, other_columns=other_columns, scaling=scaling, scaler=scaler, metric=metric, relative_feature_weight=relative_feature_weight)
-    elif type(filenames) == type([1, 2, 3]) and filenames != []:
-        total_df, pols = file_to_df(filenames[0], geometry_features=geometry_features, path=path, geometry_column=geometry_column, other_columns=other_columns, scaling=scaling, scaler=scaler, metric=metric, relative_feature_weight=relative_feature_weight)
-        for fn in filenames[1:]:
-            new_df, new_pols = file_to_df(fn, geometry_features=geometry_features, path=path, geometry_column=geometry_column, other_columns=other_columns, scaling=scaling, scaler=scaler, metric=metric, relative_feature_weight=relative_feature_weight)
-            total_df = total_df.append(new_df, ignore_index=True)
-            pols = pols + new_pols
+
+    # if isinstance(type(filenames), str):
+    total_df, pols = filepath_to_df(filepath, geometry_features=geometry_features, geometry_column=geometry_column, other_columns=other_columns, scaling=scaling, scaler=scaler, metric=metric, relative_feature_weight=relative_feature_weight)
+    ## Timo: I thought it was confusing that the filenames could be a single string or a list. I think it is better to call the function with a list of filenames. 
+    ## This way, the function is more consistent and easier to understand. However, feel free to change it back if you think it is better.
+
+    # elif isinstance(filenames, list) and filenames:
+    #     total_df, pols = file_to_df(filenames[0], geometry_features=geometry_features, path=path, geometry_column=geometry_column, other_columns=other_columns, scaling=scaling, scaler=scaler, metric=metric, relative_feature_weight=relative_feature_weight)
+    #     for fn in filenames[1:]:
+    #         new_df, new_pols = file_to_df(fn, geometry_features=geometry_features, path=path, geometry_column=geometry_column, other_columns=other_columns, scaling=scaling, scaler=scaler, metric=metric, relative_feature_weight=relative_feature_weight)
+    #         total_df = total_df.append(new_df, ignore_index=True)
+    #         pols = pols + new_pols
     total_df.columns = list(range(len(total_df.columns)))
     return total_df, pols
+
+
+if __name__ == "__main__":
+    df_path = r"C:\Users\timos\OneDrive - HAN\Future Factory\FF_BuildingSimilarityIndex\data\gpkg\testcase_overvecht.gpkg"
+    # df_path = r"C:\Users\timos\OneDrive - HAN\Future Factory\FF_BuildingSimilarityIndex\data\gpkg\test.gpkg"
+    df = gpd.read_file(df_path)
+    print(len(df))
+
+    final_df, pols = process_to_features(df_path, reference_shapes.geometry, other_columns=[], scaling=False, relative_feature_weight=False)
+    print(final_df)

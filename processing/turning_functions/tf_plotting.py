@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 import os
+import numpy as np
+
 
 def plot_tf(tf):
     plt.stairs(tf[1], np.concatenate([[0.0], tf[0]]))
@@ -77,7 +79,7 @@ def save_clusters(clustering, destination="new_features/25_clusters/", pols=poly
         plt.savefig(destination+"cluster_{0}.pdf".format(i), format='pdf')
         plt.close()
 
-        
+
 def plot_closest(ref_index, dataframe, pols=polygons, metric='l2', n_neighbors=20, filename="disance_from_polygon_", save=False, path="./"):
     ln = len(dataframe)
     distances = [dist(ref_index, i, dataframe) for i in range(ref_index)]+[0.0]+[dist(ref_index, i, dataframe) for i in range(ref_index+1, ln)]
@@ -95,7 +97,7 @@ def plot_closest(ref_index, dataframe, pols=polygons, metric='l2', n_neighbors=2
     plt.close()
 
 
-    
+
 def export_closest(ref_index, dataframe, pols=polygons, metric='l2', n_neighbors=20, filename="disance_from_polygon_", save=False, path="./", dist_columns = []):
     ln = len(dataframe)
     df_dist = dataframe.loc[:, dist_columns]
@@ -114,4 +116,4 @@ def export_closest(ref_index, dataframe, pols=polygons, metric='l2', n_neighbors
     plt.close()
 
 
-    
+
