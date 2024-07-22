@@ -7,12 +7,7 @@ import numpy as np
 import geopandas as gpd
 
 from shapely.affinity import translate
-from sklearn.preprocessing import MinMaxScaler
 
-pol_features_coords = None
-
-## Reference polygons computed by doing 30 PCA loops of the feature space.
-## Polygons were taken from both real complexes in The Netherlands and generated parameterized polygons.
 def save_pollist(pollist, file_path):
     """ Saves a list of polygons as geopackage format. Creates path if it does not exist."""
     path = os.path.dirname(file_path)
@@ -243,7 +238,7 @@ def rectangularity(pol):
     """
     return (pol.area/pol.minimum_rotated_rectangle.area)
 
-def pol_to_new_space(pol, feature_space=pol_features_coords, additional_functions=[convexity, rectangularity], metric='l1'):
+def pol_to_new_space(pol, feature_space, additional_functions=[convexity, rectangularity], metric='l1'):
     """Pol_to_new_space: pol(shapely.geometry.polygon), feature_space(list(shapely.geometry.polygon)), additional_functions(list(lambda(shapely.pol) -> float)), metric: string
     Takes a polygon and computes the turning function distance to the set of reference polygons provided in 'feature_space'.
     Other indices/features can be provided in 'additional_functions' in the form of a function mapping a shapely.geometry.polygon to a float.
@@ -251,7 +246,7 @@ def pol_to_new_space(pol, feature_space=pol_features_coords, additional_function
     pol_coords = to_list(pol.exterior.coords)
     return np.array([minimize_dist(pol_coords, feature_space[i], metric=metric) for i in range(len(feature_space))]+[i(pol) for i in additional_functions])
 
-def make_space(pol_list, features=pol_features_coords, additional_functions=[convexity, rectangularity], metric='l1'):
+def make_space(pol_list, features, additional_functions=[convexity, rectangularity], metric='l1'):
     """make_space: constructs feature space from list of polygons. See pol_to_new_space for details on how each instance is transformed to the feature space."""
     res = np.zeros((len(pol_list),len(features)))
     for i in range(len(pol_list)):
@@ -282,53 +277,33 @@ def round_polygon(pol, decimals=1, simplify_tolerance=0.2):
 def process_to_features(filepath, 
                         geometry_features,
                         geometry_column='geometry',
-                        other_columns = ['bouwjaar', 'a_vb', 'a_vb_wf', 'a_p', 'c_area', 'maxz.max', 'h_dak_70p.max'],
-                        scaling=True,
-                        scaler=MinMaxScaler(),
-                        metric='l2',
-                        relative_feature_weight = False,
-                        categorical_columns = []):
+                        metric='l1' # TODO: should this be l1 or l2? I get a lower distance with l1 which should be the opposite
+                        ):
 
     ## One file provided:
     """ Imports geopandas file with filepath.
     The geopandas-package should contain a geometry feature (name can be provided) with the 2D shape as a polygon.
     Computes turning function for polygon and computes the minimal turning function distance to all the reference polygons in geometry_features.
+    The reference polygons are computed by doing 30 PCA loops of the feature space. Polygons were taken from both real complexes in The Netherlands and generated parameterized polygons.
     """
-    def filepath_to_df(filepath, geometry_features, geometry_column='geometry', other_columns = ['bouwjaar', 'a_vb', 'a_vb_wf', 'a_p', 'c_area', 'maxz.max', 'h_dak_70p.max'], scaling=True, scaler=MinMaxScaler(), metric='l2', relative_feature_weight = False):
-        data = gpd.read_file(filepath)
-        pols = list(data[geometry_column])
-        if type(pols[0]) == shapely.geometry.MultiPolygon:
-            pols = [list(i.geoms)[0] for i in pols]
-        pols = [round_polygon(translate_pol(i)) for i in pols]
-        new_df = pd.DataFrame(make_space(pols, features=[pol_to_vec(i) for i in geometry_features], metric='l2', additional_functions=[]))
-        df_other = data[other_columns]
-        df_c = data[categorical_columns]
-        # df_c =
 
+    data = gpd.read_file(filepath)
+    pols = list(data[geometry_column])
+    if type(pols[0]) == shapely.geometry.MultiPolygon:
+        pols = [list(i.geoms)[0] for i in pols]
+    pols = [round_polygon(translate_pol(i)) for i in pols]
+    
+    # define additional functions if wanted
+    # TODO: is this necessary?
+    additional_functions = []
+    additional_functions_names = []
 
-        # Timo - I think the following code is not necessary. The data will be scaled in the similarity_calculation module. Doing that would keep everything in the relevant module
-        # if scaling:
-        #     df_other = scaler.fit_transform(df_other)
-        # if relative_feature_weight:
-        #     df_other = np.multiply(df_other, np.sqrt(len(geometry_features)))
-
-        df_other = pd.DataFrame(df_other)
-        df = pd.concat([new_df.reset_index(drop=True), df_other.reset_index(drop=True)], axis=1)
-        return df, pols
-
-    # if isinstance(type(filenames), str):
-    total_df, pols = filepath_to_df(filepath, geometry_features=geometry_features, geometry_column=geometry_column, other_columns=other_columns, scaling=scaling, scaler=scaler, metric=metric, relative_feature_weight=relative_feature_weight)
-    ## Timo: I thought it was confusing that the filenames could be a single string or a list. I think it is better to call the function with a list of filenames. 
-    ## This way, the function is more consistent and easier to understand. However, feel free to change it back if you think it is better.
-
-    # elif isinstance(filenames, list) and filenames:
-    #     total_df, pols = file_to_df(filenames[0], geometry_features=geometry_features, path=path, geometry_column=geometry_column, other_columns=other_columns, scaling=scaling, scaler=scaler, metric=metric, relative_feature_weight=relative_feature_weight)
-    #     for fn in filenames[1:]:
-    #         new_df, new_pols = file_to_df(fn, geometry_features=geometry_features, path=path, geometry_column=geometry_column, other_columns=other_columns, scaling=scaling, scaler=scaler, metric=metric, relative_feature_weight=relative_feature_weight)
-    #         total_df = total_df.append(new_df, ignore_index=True)
-    #         pols = pols + new_pols
-    total_df.columns = list(range(len(total_df.columns)))
-    return total_df, pols
+    # create the feature space based on the turning function and save it to a dataframe
+    feature_space = make_space(pols, features=[pol_to_vec(i) for i in geometry_features], metric=metric, additional_functions=additional_functions)
+    columns = list(f"turning_function_{i}" for i in range(len(geometry_features))) + additional_functions_names
+    df_turning_function = pd.DataFrame(feature_space, columns=columns)
+    
+    return df_turning_function, pols
 
 
 if __name__ == "__main__":
@@ -337,5 +312,5 @@ if __name__ == "__main__":
     df = gpd.read_file(df_path)
     print(len(df))
 
-    final_df, pols = process_to_features(df_path, reference_shapes.geometry, other_columns=[], scaling=False, relative_feature_weight=False)
-    print(final_df)
+    df_turning_function, pols = process_to_features(df_path, reference_shapes.geometry, metric='l2')
+    print(df_turning_function)
