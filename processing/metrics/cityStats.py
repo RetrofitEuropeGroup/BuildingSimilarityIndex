@@ -135,11 +135,7 @@ def clean_df(df, output):
     return clean
 
 def eligible(cm, id, report):
-    """Returns True if the building is eligible for processing, otherwise returns False"""
-    errors = get_errors_from_report(report, id, cm)
-    if errors:
-        print('Found an error')
-    
+    """Returns True if the building is eligible for processing, otherwise returns False"""    
     # we only process buildingparts as they are 3D
     if cm["CityObjects"][id]['type'] != 'BuildingPart':
         return False
@@ -356,7 +352,6 @@ def calculate_metrics(input,
 
         # create and open the report
         report = get_report(input)
-        print(report)
 
     if "transform" in cm:
         s = cm["transform"]["scale"]
@@ -370,6 +365,7 @@ def calculate_metrics(input,
     vertices = np.array(verts)
 
     # Count the number of jobs
+    #TODO: we could speed up by creating a second cm, but with only eligible buildings
     total_jobs = 0
     for obj in cm["CityObjects"]:
         if eligible(cm, obj, report):
