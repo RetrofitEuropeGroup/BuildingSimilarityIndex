@@ -50,14 +50,16 @@ def convexhull_volume(points):
         return 0
 
 def get_errors_from_report(report, objid, cm):
-    """Return the report for the feature of the given obj"""
-    if not "features" in report:
-        return []
+    """Return false / true if it finds error in the val3dity report"""
+    if report == {}:
+        return False
+    elif not "features" in report:
+        return False
 
     obj = cm["CityObjects"][objid]
 
     if not "geometry" in obj or len(obj["geometry"]) == 0:
-        return []
+        return False
 
     if "parents" in obj:
         parid = obj["parents"][0]
@@ -69,9 +71,8 @@ def get_errors_from_report(report, objid, cm):
             if f['validity'] == False:
                 return True
             else:
-                return []
-
-    return []
+                return False
+    return False
 
 def save_filter_stats(outfiltered_2d, outfiltered_3d, output):
     # split the output path to get the output folder
@@ -81,6 +82,7 @@ def save_filter_stats(outfiltered_2d, outfiltered_3d, output):
     output_name = os.path.split(output)[-1]
 
     # update the logger
+    #TODO: make this an option
     new_line = f'{output_name};{round(outfiltered_2d, 4)};{round(outfiltered_3d, 4)}\n'
     if os.path.exists(logger_path) == False:
         with open(logger_path, 'w') as f:
@@ -122,8 +124,8 @@ def clean_df(df, output):
     outfiltered_3d = (before3d - len(clean)) / before3d
 
     save_filter_stats(outfiltered_2d, outfiltered_3d, output)
+    
     # filter out the irrelevant columns
-
     irrelevant_columns = ["type", "lod", "errors", "valid", "orientation_values", "orientation_edges",
                           "hole_count", 'min_vertical_elongation', 'max_vertical_elongation']
     for col in irrelevant_columns:
@@ -133,21 +135,26 @@ def clean_df(df, output):
     return clean
 
 def eligible(cm, id, report):
-    """Returns True if the building is eligible for processing"""
-    if report == {}:
-        return True
-
+    """Returns True if the building is eligible for processing, otherwise returns False"""
     errors = get_errors_from_report(report, id, cm)
     if errors:
-        return False
-
+        print('Found an error')
+    
+    # we only process buildingparts as they are 3D
     if cm["CityObjects"][id]['type'] != 'BuildingPart':
         return False
-
+    
+    # we cannot process multiple children as some children are really small
     parent_id = cm["CityObjects"][id]['parents'][0]
     if len(cm['CityObjects'][parent_id]['children']) > 1:
         return False
-    return True
+
+    # check if there are any errors with the building in the val3dity report
+    errors = get_errors_from_report(report, id, cm)
+    if errors:
+        return False
+    else:
+        return True
 
 def get_parent_attributes(cm, obj):
     """Returns the attributes of the parent of the given object. The parent should be in the same city model."""
@@ -162,11 +169,10 @@ def get_parent_attributes(cm, obj):
 def get_report(input):
     # create the val3dity report with the same name as the input file
     val3dity_report = f"{input.name[:-5]}_report.json"
-    
-    
 
     if os.path.exists(val3dity_report):
-        report = open(val3dity_report, "rb")
+        with open(val3dity_report, "rb") as f:
+            report = json.load(f)
     else:
         try:
             # determine the location of the val3dity executable
@@ -175,9 +181,10 @@ def get_report(input):
 
             # TODO: make sure the val3dity folder is arranged correctly
             # TODO: make this subprocess again so that the output is not printed
-            os.system(f'{val3dity_cmd_location} {input.name} -r {val3dity_report}')
+            os.system(f'"{val3dity_cmd_location}" {input.name} -r {val3dity_report}')
             # subprocess.check_output(f'{val3dity_cmd_location} {input.name} -r {val3dity_report}')
-            report = open(val3dity_report, "rb")
+            with open(val3dity_report, "rb") as f:
+                report = json.load(f)
         except Exception as e:
             report = {}
             print(f"Warning: Could not run val3dity, continuing without report. Message: {e}")
@@ -332,8 +339,8 @@ def process_building(building,
 
 
 # Assume semantic surfaces
-def process_cityjson(input,
-         output,
+def calculate_metrics(input,
+         output_path=None,
          filter=None,
          repair=False,
          plot_buildings=False,
@@ -341,17 +348,15 @@ def process_cityjson(input,
          jobs=1,
          density_2d=1.0,
          density_3d=1.0):
+    """Uses a cityjson file to calculate the 2d / 3d metrics for the buildings in the cityjson file"""
+
 
     with open(input, "r") as input:
         cm = json.load(input)
 
-        # if no output file is provided, use the name of the input file. But in the output folder
-        if output is None:
-            output = input.name[:-5] + ".csv"
-            output = output.replace('input', 'output')
-
         # create and open the report
         report = get_report(input)
+        print(report)
 
     if "transform" in cm:
         s = cm["transform"]["scale"]
@@ -372,7 +377,7 @@ def process_cityjson(input,
 
 
     num_cores = jobs
-    print(f'Using {num_cores} cores to process {total_jobs} buildings')
+    print(f'Using {num_cores} core(s) to process {total_jobs} building(s)')
     with ProcessPoolExecutor(max_workers=num_cores) as pool:
         # add the jobs to the pool
         futures = []
@@ -410,26 +415,27 @@ def process_cityjson(input,
 
     df = pd.DataFrame.from_dict(stats, orient="index")
     df.index.name = "id"
+
     try:
-        clean = clean_df(df, output)
+        clean = clean_df(df, output_path)
     except Exception as e:
         print(f"ERROR: Problem with cleaning the dataframe: {e}")
         clean = df
 
     try:
-        if output.endswith(".csv"):
-            clean.to_csv(output)
-        elif output.endswith('.gpkg'):
+        if output_path.endswith(".csv"):
+            clean.to_csv(output_path)
+        elif output_path.endswith('.gpkg'):
             gdf = geopandas.GeoDataFrame(clean, geometry="geometry")
-            gdf.to_file(f"{output}", driver="GPKG")
+            gdf.to_file(f"{output_path}", driver="GPKG")
         else:
-            clean.to_excel(output)
+            raise ValueError("output_path should be a .csv or .gpkg file")
     except Exception as e:
-        print(f"ERROR: could not save the file: {e}")
-        clean.to_csv("emergency.csv")
+        print(f"ERROR: could not save the file. Error message: {e}")
 
     if os.path.exists('val3dity.log'): # clean the mess
         os.remove('val3dity.log')
+    return clean
 
 if __name__ == "__main__":
-    process_cityjson("data/bag_data_merged/merged_1.city.json", output= "./data/gpkg/test.gpkg")
+    df = calculate_metrics("data/bag_data_merged/merged_1.city.json", output_path= "./data/gpkg/test.csv", jobs=4)
