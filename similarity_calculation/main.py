@@ -1,4 +1,5 @@
 import geopandas as gpd
+import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -9,20 +10,21 @@ from sklearn.metrics.pairwise import euclidean_distances
 # TODO: split this up into multiple files
 
 class similarity:
-    def __init__(self, gpkg_path: str, column_weights: dict = None, columns: list = None):
+    def __init__(self, feature_space_path: str, column_weights: dict = None, columns: list = None):
+        # TODO: add documenation to the variables
         self._validate_input(column_weights, columns)
         
-        # load the geopandas dataframe
-        self.gpkg_path = gpkg_path
-        self.gpdf = gpd.read_file(self.gpkg_path)
+        # load the feature space data to the fs_df (feature space dataframe)
+        self.feature_space_path = feature_space_path
+        self.fs_df = pd.read_csv(feature_space_path)
 
         # needed to know which columns are relevant for the distance calculation, and if the columns should be scaled
         self.columns = self._get_columns(column_weights, columns)
         self.column_weights = column_weights
 
         # prepare (scaling & normalizing) the data for the distance calculation
-        self.prepared_gpdf = self.prepare_data(self.gpdf)
-        self.prepared_gpdf_ref = None
+        self.prepared_df = self.prepare_data(self.fs_df)
+        self.prepared_df_ref = None
     
     ## helper functions for __init__
     def _validate_input(self, column_weights, columns):
@@ -40,34 +42,36 @@ class similarity:
             return columns
     
     # function to prepare the data for the distance calculation
-    def prepare_data(self, gpdf):
-        normalized_gpdf = self._normalize(gpdf)
+    def prepare_data(self, df):
+        normalized_df = self._normalize(df)
 
         # scale only if needed (if column_weights is given)
         if self.column_weights is not None:
-            prepared_gpdf = self._scale(normalized_gpdf)
+            prepared_df = self._scale(normalized_df)
         else:
-            prepared_gpdf = normalized_gpdf
-        return prepared_gpdf
+            prepared_df = normalized_df
+        return prepared_df
 
-    def _normalize(self, gpdf):
+    def _normalize(self, df):
         """normalize the columns in the geopandas dataframe so that every feature has the same weight in the distance calculation"""
-        prepared_gpdf = gpdf.copy()
+        prepared_df = df.copy()
         
         for column in self.columns:
-            if self.gpdf[column].dtype != "float64":
-                prepared_gpdf[column] = prepared_gpdf[column].astype(float)
+            if df[column].dtype != "float64":
+                prepared_df[column] = prepared_df[column].astype(float)
             try:
-                prepared_gpdf[column] = (prepared_gpdf[column] - prepared_gpdf[column].mean()) / prepared_gpdf[column].std()
+                prepared_df[column] = (prepared_df[column] - prepared_df[column].mean()) / prepared_df[column].std()
             except Exception as e:
                 raise ValueError(f"Could not normalize column: {column}. Error: {e}")
         
-        return prepared_gpdf
+        return prepared_df
     
-    def _scale(self, gpdf):
-        """scale the columns in the geopandas dataframe according to the given weights, so that the features have different weights in the distance calculation"""
+    def _scale(self, df):
+        """scale the columns in the dataframe according to the given weights, so that the features have different weights in the distance calculation"""
+        scaled_df = df.copy()
         for column, weight in self.column_weights.items():
-            self.gpdf[column] = self.gpdf[column] * weight
+            scaled_df[column] = df[column] * weight
+        return scaled_df
 
     ## main functions
     # function to calculate the distance between two objects
@@ -79,12 +83,12 @@ class similarity:
             id2 = f"NL.IMBAG.Pand.{id2}-0"
 
         # check if the ids are in the geopandas dataframe
-        if id1 not in self.prepared_gpdf["id"].values:
-            raise ValueError(f"id1 {id1} not found in the geopandas dataframe")
-        if self.prepared_gpdf_ref is None and id2 not in self.prepared_gpdf["id"].values:
-            raise ValueError(f"id2 {id2} not found in the geopandas dataframe")
+        if id1 not in self.prepared_df["id"].values:
+            raise ValueError(f"id1 {id1} not found in the dataframe")
+        if self.prepared_df_ref is None and id2 not in self.prepared_df["id"].values:
+            raise ValueError(f"id2 {id2} not found in the dataframe")
         # consider the reference geopandas dataframe if it is given, don't look at the original geopandas dataframe
-        if self.prepared_gpdf_ref is not None and id2 not in self.prepared_gpdf_ref["id"].values:
+        if self.prepared_df_ref is not None and id2 not in self.prepared_df_ref["id"].values:
             raise ValueError(f"id2 {id2} not found in the reference geopandas dataframe")
         
         # if all good, return the ids
@@ -94,11 +98,11 @@ class similarity:
         id1, id2 = self.check_ids(id1, id2)
 
         # for obj2 consider the reference geopandas dataframe if it is given, otherwise use the original geopandas dataframe
-        obj1 = self.prepared_gpdf[self.prepared_gpdf["id"] == id1]
-        if self.prepared_gpdf_ref is None:
-            obj2 = self.prepared_gpdf[self.prepared_gpdf["id"] == id2]
+        obj1 = self.prepared_df[self.prepared_df["id"] == id1]
+        if self.prepared_df_ref is None:
+            obj2 = self.prepared_df[self.prepared_df["id"] == id2]
         else:
-            obj2 = self.prepared_gpdf_ref[self.prepared_gpdf_ref["id"] == id2]
+            obj2 = self.prepared_df_ref[self.prepared_df_ref["id"] == id2]
 
         # calculate the euclidean distance between the two objects
         dist = euclidean_distances(obj1[self.columns], obj2[self.columns])
@@ -172,12 +176,12 @@ class similarity:
         
         # prepare the reference data
         self.gpdf_ref = gpd.read_file(gpkg_ref)
-        self.prepared_gpdf_ref = self.prepare_data(self.gpdf_ref)
+        self.prepared_df_ref = self.prepare_data(self.gpdf_ref)
 
         # create an empty matrix and get all ids
         matrix = np.array([])
-        reference_ids = self.prepared_gpdf_ref["id"].values
-        all_ids = self.prepared_gpdf["id"].values
+        reference_ids = self.prepared_df_ref["id"].values
+        all_ids = self.prepared_df["id"].values
 
         fmt = '%s'
         header = 'id,' + ",".join(reference_ids)
@@ -209,7 +213,7 @@ class similarity:
         self.is_csv(output_path)
 
         # create an empty matrix and get all ids
-        all_ids = self.prepared_gpdf["id"].values
+        all_ids = self.prepared_df["id"].values
         header = ",".join(all_ids)
         matrix = np.array([])
 
