@@ -13,4 +13,4 @@ rtree==1.2.0
 scikit-learn===1.3.2
 cjio==0.9.0
 aiohttp==3.9.5
-requests==2.31.0 #TODO: add the version for the other packages
+requests==2.31.0
