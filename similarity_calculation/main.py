@@ -11,7 +11,17 @@ from sklearn.metrics.pairwise import euclidean_distances
 
 class similarity:
     def __init__(self, feature_space_path: str, column_weights: dict = None, columns: list = None):
-        # TODO: add documenation to the variables
+        """
+        Initializes the SimilarityCalculator object which can be used to calculate the distance between two objects in the feature space data.
+        This can be done for two object (calculate_distance), between all objects in the feature space data (distance_matrix) or the distance
+        between a few reference buildings and a large set of buildings (distance_matrix_reference).
+
+        Args:
+            feature_space_path (str): The file path to the csv file with the feature space data.
+            column_weights (dict, optional): A dictionary specifying the weights for the distance calculation of each column. Defaults to None.
+            columns (list, optional): A list of column names to consider for the distance calculation, if used all columns bear the same weight. Defaults to None.
+        """
+
         self._validate_input(column_weights, columns)
         
         # load the feature space data to the fs_df (feature space dataframe)
