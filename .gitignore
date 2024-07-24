@@ -8,4 +8,6 @@ val3dity.log
 *.py~
 analysis/*
 processing/metrics/val3dity/*
-# TODO: make sure data folder is created on git clone
+
+# keep the folders that have a .gitkeep file, but ignore their contents
+!*/.gitkeep
