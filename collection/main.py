@@ -48,16 +48,24 @@ class collection():
 
         # Remove the prefix from the ids so they are consistent. also check if the file already exists to avoid unnecessary requests
         request_ids = []
+        existing_files = 0
         for id in all_ids:
             if id.startswith("NL.IMBAG.Pand."):
                 id = id[14:]
 
             if os.path.exists(f"{self._bag_data_folder}/{id}.city.json"):
-                print(f"File {id}.city.json already exists, skipping")
+                existing_files += 1
             else:
                 request_ids.append(id)
 
-        # make the urls for the async requests
+        # check how many requests are needed
+        if existing_files == len(all_ids):
+            print("All the requested data is already saved, no new requests are needed.")
+            return
+        elif existing_files > 0:
+            print(f"{existing_files} out of {len(all_ids)} files already exist, so {len(all_ids) - existing_files} more request(s) are needed.")
+        
+        ## make the urls for the async requests
         all_urls = [f"https://api.3dbag.nl/collections/pand/items/NL.IMBAG.Pand.{id}" for id in request_ids]
         result = asyncio.run(request_url_list(all_urls))
 
