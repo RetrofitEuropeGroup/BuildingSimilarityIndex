@@ -100,10 +100,13 @@ def clean_df(df, output):
     clean = df[df['actual_volume'] < df['convex_hull_volume']]
     clean = clean[clean['actual_volume'] >= 40]
     clean = clean[clean['hole_count'] == 0]
+    rows_lost_perc = (len(df) - len(clean)) / len(df)
+    if rows_lost_perc > 0.2:
+        print(f'WARNING: {rows_lost_perc:.2%} of the buildings has been deleted as it did not meet on of the following three requirements: actual_volume is bigger than convex_hull_volume, actual_volume is lager than 40, hole_count is zero')
+
 
     ## filter out the buildings with index values out of the range
     # start with determining which indices are 2d and 3d
-
     indices_2d = [col for col in df.columns if col.endswith("_2d")] + ["horizontal_elongation"]
 
     indices_3d = ([col for col in df.columns if col.endswith("_3d")] +
@@ -123,7 +126,9 @@ def clean_df(df, output):
     outfiltered_2d = (before2d - after2d) / before2d
     outfiltered_3d = (before3d - len(clean)) / before3d
 
-    save_filter_stats(outfiltered_2d, outfiltered_3d, output)
+    # TODO: make a logger that prints the percentage of buildings that are filtered out, and due to what cause
+    if output is not None:
+        save_filter_stats(outfiltered_2d, outfiltered_3d, output)
     
     # filter out the irrelevant columns
     irrelevant_columns = ["type", "lod", "errors", "valid", "orientation_values", "orientation_edges",
@@ -352,6 +357,9 @@ def calculate_metrics(input,
 
         # create and open the report
         report = get_report(input)
+        
+        if os.path.exists('val3dity.log'): # clean the mess
+            os.remove('val3dity.log')
 
     if "transform" in cm:
         s = cm["transform"]["scale"]
@@ -419,19 +427,16 @@ def calculate_metrics(input,
         clean = df
 
     try:
-        if output_path.endswith(".csv"):
+        if output_path is not None and output_path.endswith(".csv"):
             clean.to_csv(output_path)
-        elif output_path.endswith('.gpkg'):
+        elif output_path is not None and output_path.endswith('.gpkg'):
             gdf = geopandas.GeoDataFrame(clean, geometry="geometry")
             gdf.to_file(f"{output_path}", driver="GPKG")
-        else:
+        elif output_path is not None:
             raise ValueError("output_path should be a .csv or .gpkg file")
     except Exception as e:
         print(f"ERROR: could not save the file. Error message: {e}")
-
-    if os.path.exists('val3dity.log'): # clean the mess
-        os.remove('val3dity.log')
     return clean
 
 if __name__ == "__main__":
-    df = calculate_metrics("data/bag_data_merged/merged_1.city.json", output_path= "./data/gpkg/test.csv", jobs=4)
+    df = calculate_metrics("data/bag_data_merged/merged_1.city.json", output_path="./data/gpkg/test.csv", jobs=4)

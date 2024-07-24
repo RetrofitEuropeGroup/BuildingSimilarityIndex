@@ -7,10 +7,12 @@ file_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(file_dir)
 
 from merge_cityjson import MergeCityJSON
-from metrics.cityStats import process_cityjson
+from metrics.cityStats import calculate_metrics
+from turning_functions.main import process_to_features
 
 class processing():
-    def __init__(self, gpkg_path: str, bag_data_folder: str = None, cityjson_path: str = None):
+    def __init__(self, output_path: str, bag_data_folder: str = None, cityjson_path: str = None):
+        # TODO: add documentation about the variables
         if bag_data_folder is None and cityjson_path is None:
             raise ValueError("Either input_folder or cityjson_path should be provided")
         elif bag_data_folder is not None and cityjson_path is not None:
@@ -18,20 +20,18 @@ class processing():
 
         self.bag_data_folder = bag_data_folder
         self.cityjson_path = cityjson_path
-        self.validate_gpkg_path(gpkg_path)
+        self.validate_output_path(output_path)
 
 
-    def validate_gpkg_path(self, file_path: str):
-        if isinstance(file_path, str) == False:
-            raise ValueError("The gpkg_path (which is the output file) should be a string")
-        elif file_path.endswith('.gpkg') == False:
-            raise ValueError("""The gpkg_path (which is the output file) is the path to where the geopackage
-                              data frame will be saved. Extension should be .gpkg""")
+    def validate_output_path(self, file_path: str):
+        if file_path.endswith('.csv') == False:
+            raise ValueError("""The output_path can only be a .csv file""")
         else:
-            self.gpkg_path = file_path
-        parent_dir = os.path.dirname(self.gpkg_path)
-        if not os.path.exists(parent_dir):
-            os.makedirs(parent_dir)
+            parent_dir = os.path.dirname(file_path)
+            if not os.path.exists(parent_dir):
+                os.makedirs(parent_dir)
+
+            self.output_path = file_path        
 
     # main functions
     def merge_files(self):
@@ -42,30 +42,34 @@ class processing():
 
         self.cityjson_path = merger.file_path
 
-    def initiate_gpkg(self):
-        """ Initiates the .gpkg path with the 2d and 3d metrics"""
-        # determine the number of processors to use and where the cityStats.py file is located
+    def create_feature_space(self):
+        """ Create a pd dataframe with the feature space. First step in the process is to calculate the 2d / 3d metrics on the merged cityjson which outputs a geo df, this is then used to execute the turning function"""
+        # determine the number of processors to use and where the cityStats.py file is located, max function is used to prevent using all processors while at the same time ensuring that at least 1 processor is used
         n_processors = max(os.cpu_count() - 1, 1)
 
-        # run the citystats script
-        process_cityjson(self.cityjson_path, self.gpkg_path, jobs=n_processors)
+        # run the citystats script in which the metrics are calculated
+        feature_space_metrics = calculate_metrics(input=self.cityjson_path, jobs=n_processors)
+
+        # execute the turning function
+        feature_space_tf = process_to_features(feature_space_metrics)
+
+        # merge the results in one data frame & return the df
+        feature_space_full = feature_space_metrics.merge(feature_space_tf, on='id')
+        return feature_space_full
 
     def run(self):
-        # merge if not a single file has been provided
+        # merge if a folder has been provided
         if self.bag_data_folder is not None:
             self.merge_files()
 
-        # calculate the 2d / 3d metrics and save them to a gpkg
-        self.initiate_gpkg()
-
-        # TODO: add the results from the turning function, you can load the geometry from the gpkg.
-        # the filepath of the gpkg is stored in self.gpkg_path
-
+        # calculate the 2d / 3d metrics and turning funciton features
+        feature_space_full = self.create_feature_space()
+        feature_space_full.to_csv(self.output_path)
 
 if __name__ == '__main__':
-    p = processing(gpkg_path="data/gpkg/testcase_overvecht.gpkg", bag_data_folder="data/bag_data")
-    # p = processing(cityjson_path="analysis/voorbeeldwoningen.city.json", gpkg_path="collection/output/output.gpkg")
+    p = processing(output_path="data/feature_space/test_fast.csv", bag_data_folder="data/bag_data")
     p.run()
-    import geopandas as gpd
-    gdf = gpd.read_file(p.gpkg_path)
-    print(gdf.columns)
+    
+    import pandas as pd
+    df = pd.read_csv(p.output_path)
+    print(df.head())

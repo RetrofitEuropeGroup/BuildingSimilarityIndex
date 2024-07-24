@@ -1,11 +1,11 @@
 import os
 import shapely
-import geopandas as gpd
 
+import geopandas as gpd
 import pandas as pd
 import numpy as np
-import geopandas as gpd
 
+from tqdm import tqdm
 from shapely.affinity import translate
 
 def save_pollist(pollist, file_path):
@@ -19,13 +19,10 @@ def save_pollist(pollist, file_path):
     df.to_file(os.path.join(file_path), driver=driver)
 
 
-def pol_to_vec(pol):
+def polygon_to_vector(pol):
     """Converts a shapely polygon to a list of coordinates."""
     return [list(i) for i in pol.exterior.coords]
 
-file_dir = os.path.dirname(os.path.realpath(__file__))
-reference_shapes = gpd.read_file(os.path.join(file_dir, "reference_polygons", "30_ref_pols.gpkg"))
-reference_shapes_coords = [pol_to_vec(i) for i in reference_shapes.geometry]
 
 def an(v1):
     """ Computes angle between vector and x-axis. """
@@ -34,6 +31,7 @@ def an(v1):
         return np.arccos(v1[0])
     else:
         return 2*np.pi - np.arccos(v1[0])
+
 
 ## Therefore, given normalized vector:
 def angle(v1,v2):
@@ -60,7 +58,7 @@ def seq_to_diff(v, no_start_zero=True):
 
 # Function that translates a geometry to start in (0,0)
 def update_geo(geometry):
-    geo_coords = pol_to_vec(geometry)
+    geo_coords = polygon_to_vector(geometry)
     first_coord = geo_coords[0]
     for i in range(len(geo_coords)):
         geo_coords[i]=np.subtract(geo_coords[i],first_coord)
@@ -238,8 +236,8 @@ def rectangularity(pol):
     """
     return (pol.area/pol.minimum_rotated_rectangle.area)
 
-def pol_to_new_space(pol, feature_space, additional_functions=[convexity, rectangularity], metric='l1'):
-    """Pol_to_new_space: pol(shapely.geometry.polygon), feature_space(list(shapely.geometry.polygon)), additional_functions(list(lambda(shapely.pol) -> float)), metric: string
+def polygon_to_new_space(pol, feature_space, additional_functions=[convexity, rectangularity], metric='l1'):
+    """Polygon_to_new_space: pol(shapely.geometry.polygon), feature_space(list(shapely.geometry.polygon)), additional_functions(list(lambda(shapely.pol) -> float)), metric: string
     Takes a polygon and computes the turning function distance to the set of reference polygons provided in 'feature_space'.
     Other indices/features can be provided in 'additional_functions' in the form of a function mapping a shapely.geometry.polygon to a float.
     By default, adds convexity and rectangularity."""
@@ -247,12 +245,10 @@ def pol_to_new_space(pol, feature_space, additional_functions=[convexity, rectan
     return np.array([minimize_dist(pol_coords, feature_space[i], metric=metric) for i in range(len(feature_space))]+[i(pol) for i in additional_functions])
 
 def make_space(pol_list, features, additional_functions=[convexity, rectangularity], metric='l1'):
-    """make_space: constructs feature space from list of polygons. See pol_to_new_space for details on how each instance is transformed to the feature space."""
+    """make_space: constructs feature space from list of polygons. See polygon_to_new_space for details on how each instance is transformed to the feature space."""
     res = np.zeros((len(pol_list),len(features)))
-    for i in range(len(pol_list)):
-        res[i,:] = pol_to_new_space(pol_list[i], feature_space=features, additional_functions=additional_functions, metric=metric)
-        if i%10 == 0:
-            print("Working on pol {0}".format(i))
+    for i in tqdm(range(len(pol_list))):
+        res[i,:] = polygon_to_new_space(pol_list[i], feature_space=features, additional_functions=additional_functions, metric=metric)
     return res
 
 
@@ -274,21 +270,24 @@ def round_polygon(pol, decimals=1, simplify_tolerance=0.2):
     return shapely.geometry.Polygon(zip(xx, yy))
 
 
-def process_to_features(filepath, 
-                        geometry_features,
+def process_to_features(df, 
+                        reference_shapes_path=None,
                         geometry_column='geometry',
                         metric='l1' # TODO: should this be l1 or l2? I get a lower distance with l1 which should be the opposite
                         ):
 
     ## One file provided:
-    """ Imports geopandas file with filepath.
-    The geopandas-package should contain a geometry feature (name can be provided) with the 2D shape as a polygon.
+    """ The dataframe should be a geopandas-dataframe and should contain a geometry feature (name can be provided) with the 2D shape as a polygon.
     Computes turning function for polygon and computes the minimal turning function distance to all the reference polygons in geometry_features.
     The reference polygons are computed by doing 30 PCA loops of the feature space. Polygons were taken from both real complexes in The Netherlands and generated parameterized polygons.
     """
 
-    data = gpd.read_file(filepath)
-    pols = list(data[geometry_column])
+    if reference_shapes_path is None:
+        file_dir = os.path.dirname(os.path.realpath(__file__))
+        reference_shapes_path = os.path.join(file_dir, "reference_polygons", "30_ref_pols.gpkg")
+    reference_shapes = gpd.read_file(reference_shapes_path)
+    
+    pols = list(df[geometry_column])
     if type(pols[0]) == shapely.geometry.MultiPolygon:
         pols = [list(i.geoms)[0] for i in pols]
     pols = [round_polygon(translate_pol(i)) for i in pols]
@@ -299,11 +298,12 @@ def process_to_features(filepath,
     additional_functions_names = []
 
     # create the feature space based on the turning function and save it to a dataframe
-    feature_space = make_space(pols, features=[pol_to_vec(i) for i in geometry_features], metric=metric, additional_functions=additional_functions)
-    columns = list(f"turning_function_{i}" for i in range(len(geometry_features))) + additional_functions_names
+    feature_space = make_space(pols, features=[polygon_to_vector(i) for i in reference_shapes.geometry], metric=metric, additional_functions=additional_functions)
+    columns = list(f"turning_function_{i}" for i in range(len(reference_shapes.geometry))) + additional_functions_names
     df_turning_function = pd.DataFrame(feature_space, columns=columns)
+    df_turning_function = df_turning_function.set_index(df.index)
     
-    return df_turning_function, pols
+    return df_turning_function
 
 
 if __name__ == "__main__":
@@ -312,5 +312,5 @@ if __name__ == "__main__":
     df = gpd.read_file(df_path)
     print(len(df))
 
-    df_turning_function, pols = process_to_features(df_path, reference_shapes.geometry, metric='l2')
+    df_turning_function = process_to_features(df_path, metric='l2')
     print(df_turning_function)
