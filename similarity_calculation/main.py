@@ -7,8 +7,6 @@ from tqdm import tqdm
 from sklearn.metrics.pairwise import euclidean_distances
 
 
-# TODO: split this up into multiple files
-
 class similarity:
     def __init__(self, feature_space_path: str, column_weights: dict = None, columns: list = None):
         """
@@ -105,6 +103,7 @@ class similarity:
         return id1, id2
 
     def calculate_distance(self, id1, id2):
+        # TODO: make something for categorical columns
         id1, id2 = self.check_ids(id1, id2)
 
         # for obj2 consider the reference geopandas dataframe if it is given, otherwise use the original geopandas dataframe
@@ -120,7 +119,7 @@ class similarity:
     
     def calculate_similarity(self, id1, id2):
         dist = self.calculate_distance(id1, id2)
-        if self.column_weights is not None:
+        if self.column_weights is not None: #TODO: move this to calculate_distance
             normalized_dist = dist / sum(self.column_weights.values())
         else:
             normalized_dist = dist / len(self.columns)
