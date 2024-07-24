@@ -169,7 +169,7 @@ def get_parent_attributes(cm, obj):
 
 def get_report(input):
     # create the val3dity report with the same name as the input file
-    val3dity_report = f"{input.name[:-5]}_report.json"
+    val3dity_report = f"{input[:-5]}_report.json"
 
     if os.path.exists(val3dity_report):
         with open(val3dity_report, "rb") as f:
@@ -180,9 +180,9 @@ def get_report(input):
             file_dir = os.path.dirname(os.path.realpath(__file__))
             val3dity_cmd_location = os.path.join(file_dir, 'val3dity/val3dity')
 
-            # TODO: make sure the val3dity folder is arranged correctly
             # TODO: make this subprocess again so that the output is not printed
-            os.system(f'"{val3dity_cmd_location}" {input.name} -r {val3dity_report}')
+            command = f'""{val3dity_cmd_location}" "{input}" -r "{val3dity_report}""'
+            os.system(command)
             # subprocess.check_output(f'{val3dity_cmd_location} {input.name} -r {val3dity_report}')
             with open(val3dity_report, "rb") as f:
                 report = json.load(f)
@@ -351,9 +351,8 @@ def calculate_metrics(input,
          density_3d=1.0):
     """Uses a cityjson file to calculate the 2d / 3d metrics for the buildings in the cityjson file"""
 
-
-    with open(input, "r") as input:
-        cm = json.load(input)
+    with open(input, "r") as f:
+        cm = json.load(f)
 
         # create and open the report
         report = get_report(input)
