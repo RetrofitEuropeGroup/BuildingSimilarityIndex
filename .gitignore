@@ -10,4 +10,4 @@ analysis/*
 processing/metrics/val3dity/*
 
 # keep the folders that have a .gitkeep file, but ignore their contents
-!*/.gitkeep
+!*.gitkeep
