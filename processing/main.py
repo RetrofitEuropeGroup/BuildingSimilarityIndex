@@ -24,9 +24,9 @@ class processing():
             cityjson_file (str, optional): The path to the CityJSON file with a single or multiple buildings. Defaults to None.
         """
 
-        self.bag_data_folder = bag_data_folder
-        self.cityjson_file = cityjson_file
-        self.set_output_file(output_file)
+        self._bag_data_folder = bag_data_folder
+        self._cityjson_file = cityjson_file
+        self._set_output_file(output_file)
 
         if bag_data_folder is None and cityjson_file is None:
             raise ValueError("Either input_folder or cityjson_file should be provided")
@@ -35,7 +35,7 @@ class processing():
 
         
 
-    def set_output_file(self, file_path: str):
+    def _set_output_file(self, file_path: str):
         if file_path.endswith('.csv') == False:
             raise ValueError("The output_file can only be a .csv file")
         else:
@@ -46,21 +46,21 @@ class processing():
             self.output_file = file_path        
 
     # main functions
-    def merge_files(self):
+    def _merge_files(self):
         """ Merges the files in the input folder to a single file"""
-        merge_folder = Path(self.bag_data_folder.replace('bag_data', 'bag_data_merged')) # create a new folder, if needed, for the merged files
-        merger = MergeCityJSON(self.bag_data_folder, output_folder=merge_folder)
+        merge_folder = Path(self._bag_data_folder.replace('bag_data', 'bag_data_merged')) # create a new folder, if needed, for the merged files
+        merger = MergeCityJSON(self._bag_data_folder, output_folder=merge_folder)
         merger.run()
 
-        self.cityjson_file = merger.file_path
+        self._cityjson_file = merger.file_path
 
-    def create_feature_space(self):
+    def _create_feature_space(self):
         """ Create a pd dataframe with the feature space. First step in the process is to calculate the 2d / 3d metrics on the merged cityjson which outputs a geo df, this is then used to execute the turning function"""
         # determine the number of processors to use and where the cityStats.py file is located, max function is used to prevent using all processors while at the same time ensuring that at least 1 processor is used
         n_processors = max(os.cpu_count() - 1, 1)
 
         # run the citystats script in which the metrics are calculated
-        feature_space_metrics = calculate_metrics(input=self.cityjson_file, jobs=n_processors)
+        feature_space_metrics = calculate_metrics(input=self._cityjson_file, jobs=n_processors)
 
         # execute the turning function
         feature_space_tf = process_to_features(feature_space_metrics)
@@ -73,11 +73,11 @@ class processing():
 
     def run(self):
         # merge if a folder has been provided
-        if self.bag_data_folder is not None:
-            self.merge_files()
+        if self._bag_data_folder is not None:
+            self._merge_files()
 
         # calculate the 2d / 3d metrics and turning funciton features
-        self.feature_space = self.create_feature_space()
+        self.feature_space = self._create_feature_space()
         self.feature_space.to_csv(self.output_file)
 
 if __name__ == '__main__':
