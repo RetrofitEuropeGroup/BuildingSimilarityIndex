@@ -31,7 +31,7 @@ class similarity:
         self.column_weights = column_weights
 
         # prepare (scaling & normalizing) the data for the distance calculation
-        self.prepared_df = self.prepare_data(self.fs_df)
+        self.prepared_df = self._prepare_data(self.fs_df)
         self.prepared_df_ref = None
     
     ## helper functions for __init__
@@ -50,7 +50,7 @@ class similarity:
             return columns
     
     # function to prepare the data for the distance calculation
-    def prepare_data(self, df):
+    def _prepare_data(self, df):
         normalized_df = self._normalize(df)
 
         # scale only if needed (if column_weights is given)
@@ -83,7 +83,8 @@ class similarity:
 
     ## main functions
     # function to calculate the distance between two objects
-    def check_ids(self, id1, id2):
+    #TODO: use this or remove it
+    def _check_ids(self, id1, id2):
         # check if the ids are in the correct format
         if not id1.startswith("NL.IMBAG.Pand."):
             id1 = f"NL.IMBAG.Pand.{id1}-0"
@@ -101,32 +102,9 @@ class similarity:
         
         # if all good, return the ids
         return id1, id2
-
-    def calculate_distance(self, id1, id2):
-        # TODO: make something for categorical columns
-        id1, id2 = self.check_ids(id1, id2)
-
-        # for obj2 consider the reference geopandas dataframe if it is given, otherwise use the original geopandas dataframe
-        obj1 = self.prepared_df[self.prepared_df["id"] == id1]
-        if self.prepared_df_ref is None:
-            obj2 = self.prepared_df[self.prepared_df["id"] == id2]
-        else:
-            obj2 = self.prepared_df_ref[self.prepared_df_ref["id"] == id2]
-
-        # calculate the euclidean distance between the two objects
-        dist = euclidean_distances(obj1[self.columns], obj2[self.columns])
-        return dist[0][0]
-    
-    def calculate_similarity(self, id1, id2):
-        dist = self.calculate_distance(id1, id2)
-        if self.column_weights is not None: #TODO: move this to calculate_distance
-            normalized_dist = dist / sum(self.column_weights.values())
-        else:
-            normalized_dist = dist / len(self.columns)
-        return 1 / (1 + normalized_dist)
     
     # function to calculate the distance matrix
-    def mirror(self, matrix):
+    def _mirror(self, matrix):
         upper_tri = np.triu(matrix)
         lower_tri = upper_tri.T
         mirrored_matrix = upper_tri + lower_tri
@@ -135,12 +113,25 @@ class similarity:
     def save(self, matrix, output_path, header, fmt='%f'):
         if matrix.shape[0] == matrix.shape[1]:
             print("Matrix is square")
-            matrix = self.mirror(matrix)
+            matrix = self._mirror(matrix)
         
         np.savetxt(output_path, matrix, delimiter=",", fmt=fmt, header=header, comments='')
         return matrix
 
-    def plot(self, matrix, all_ids):
+    def _is_csv(self, output_path):
+        if isinstance(output_path, str) and output_path.endswith('.csv') == False:
+            raise ValueError("output_path must end with '.csv'")
+        else:
+            return True
+
+    def _update_matrix(self, row, matrix):
+        if matrix.size == 0:
+                matrix = row
+        else:
+            matrix = np.vstack((matrix, row))
+        return matrix
+
+    def plot_matrix(self, matrix, all_ids):
         if matrix.shape[0] != matrix.shape[1]:
             raise ValueError("Matrix is not square, cannot plot")
         if matrix.shape[0] != len(all_ids):
@@ -154,18 +145,13 @@ class similarity:
         plt.colorbar()
         plt.show()
 
-    def is_csv(self, output_path):
-        if isinstance(output_path, str) and output_path.endswith('.csv') == False:
-            raise ValueError("output_path must end with '.csv'")
+    def calculate_similarity(self, id1, id2):
+        dist = self.calculate_distance(id1, id2)
+        if self.column_weights is not None: #TODO: move this to calculate_distance
+            normalized_dist = dist / sum(self.column_weights.values())
         else:
-            return True
-
-    def update_matrix(self, row, matrix):
-        if matrix.size == 0:
-                matrix = row
-        else:
-            matrix = np.vstack((matrix, row))
-        return matrix
+            normalized_dist = dist / len(self.columns)
+        return 1 / (1 + normalized_dist)
 
     def distance_matrix_reference(self,
                                 gpkg_ref: str = None,
@@ -178,14 +164,14 @@ class similarity:
         # TODO: split this & the regular distance matrix function into smaller functions, which can be reused
         
         # check the input variables
-        self.is_csv(output_path)
+        self._is_csv(output_path)
 
         if gpkg_ref is None or not isinstance(gpkg_ref, str):
             raise ValueError("gpkg_ref must be a string containing the path to a geopackage file")
         
         # prepare the reference data
         self.gpdf_ref = gpd.read_file(gpkg_ref)
-        self.prepared_df_ref = self.prepare_data(self.gpdf_ref)
+        self.prepared_df_ref = self._prepare_data(self.gpdf_ref)
 
         # create an empty matrix and get all ids
         matrix = np.array([])
@@ -202,7 +188,7 @@ class similarity:
             for id2 in reference_ids:
                 dist = self.calculate_distance(id1, id2)
                 row = np.append(row, round(dist, 5))
-            matrix = self.update_matrix(row, matrix)
+            matrix = self._update_matrix(row, matrix)
             
             progress.update(len(reference_ids)) # update the progress bar
             # save the matrix to a file if the interval is reached
@@ -218,8 +204,8 @@ class similarity:
         return matrix
 
         
-    def distance_matrix_regular(self, output_path: str = None, save_interval: int = 100, plot: bool = False):
-        self.is_csv(output_path)
+    def distance_matrix_regular(self, output_path: str = None, save_interval: int = 100, plot_matrix: bool = False):
+        self._is_csv(output_path)
 
         # create an empty matrix and get all ids
         all_ids = self.prepared_df["id"].values
@@ -252,11 +238,11 @@ class similarity:
             mirrored_matrix = self.save(matrix, output_path, header)
             print("Distance matrix calculated and saved to 'distance_matrix.csv'")
         else:
-            mirrored_matrix = self.mirror(matrix)
+            mirrored_matrix = self._mirror(matrix)
             print("Distance matrix calculated")
         
-        if plot:
-            self.plot(mirrored_matrix, all_ids)
+        if plot_matrix:
+            self.plot_matrix(mirrored_matrix, all_ids)
 
         return mirrored_matrix, all_ids
 
