@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+import pandas as pd
 
 # add the path of the own directory to the system path so that the modules can be imported
 file_dir = os.path.dirname(os.path.realpath(__file__))
@@ -11,7 +12,7 @@ from metrics.cityStats import calculate_metrics
 from turning_functions.main import perform_turning_function
 
 class processing():
-    def __init__(self, output_file: str, bag_data_folder: str = None, cityjson_file: str = None):
+    def __init__(self, output_file: str, bag_data_folder: str = None, cityjson_file: str = None, categorical_columns: list = None):
         """
         Initializes an instance of the class that is used to process the data. Processing the data consists of 
         two steps: merging the files in the input folder to a single file (1) and creating a feature space from the merged file.
@@ -22,18 +23,18 @@ class processing():
             output_file (str): The path to the output file where the processed data (feature space) will be saved.
             bag_data_folder (str, optional): The path to the folder containing cityjson with a single building, source is from the BAG. Defaults to None.
             cityjson_file (str, optional): The path to the CityJSON file with a single or multiple buildings. Defaults to None.
+            categorical_columns (list, optional): A list of column names that are categorical, these columns will get distance 1/num_categories if they are not equal and 0 if they are. Defaults to None.
         """
 
         self._bag_data_folder = bag_data_folder
         self._cityjson_file = cityjson_file
+        self._categorical_columns = categorical_columns
         self._set_output_file(output_file)
 
         if bag_data_folder is None and cityjson_file is None:
             raise ValueError("Either input_folder or cityjson_file should be provided")
         elif bag_data_folder is not None and cityjson_file is not None:
             raise ValueError("It is not possible to use both bag_data_folder and cityjson_file")
-
-        
 
     def _set_output_file(self, file_path: str):
         if file_path.endswith('.csv') == False:
@@ -76,13 +77,16 @@ class processing():
         if self._bag_data_folder is not None:
             self._merge_files()
 
-        # calculate the 2d / 3d metrics and turning funciton features
+        # calculate the 2d / 3d metrics and turning function features
         # TODO: create a single progress bar
         self.feature_space = self._create_feature_space()
+        if self._categorical_columns is not None:
+            self.feature_space = pd.get_dummies(self.feature_space, columns=self._categorical_columns, dtype=int)
+        
         self.feature_space.to_csv(self.output_file)
 
 if __name__ == '__main__':
-    p = processing(output_file="data/feature_space/test_fast.csv", bag_data_folder="data/bag_data")
+    p = processing(output_file="data/feature_space/test_processing.csv", bag_data_folder="data/bag_data", categorical_columns=['random_cat'])
     p.run()
     
     import pandas as pd
