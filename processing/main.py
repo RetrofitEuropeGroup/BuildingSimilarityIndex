@@ -8,7 +8,7 @@ sys.path.append(file_dir)
 
 from merge_cityjson import MergeCityJSON
 from metrics.cityStats import calculate_metrics
-from turning_functions.main import process_to_features
+from turning_functions.main import perform_turning_function
 
 class processing():
     def __init__(self, output_file: str, bag_data_folder: str = None, cityjson_file: str = None):
@@ -63,7 +63,7 @@ class processing():
         feature_space_metrics = calculate_metrics(input=self._cityjson_file, jobs=n_processors)
 
         # execute the turning function
-        feature_space_tf = process_to_features(feature_space_metrics)
+        feature_space_tf = perform_turning_function(feature_space_metrics)
 
         # merge the results in one data frame & return the df
         feature_space_merged = feature_space_metrics.merge(feature_space_tf, on='id')
