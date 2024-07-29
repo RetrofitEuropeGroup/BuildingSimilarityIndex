@@ -145,6 +145,21 @@ class similarity:
         plt.colorbar()
         plt.show()
 
+    def calculate_distance(self, id1, id2):
+        # TODO: make something for categorical columns
+        id1, id2 = self._check_ids(id1, id2)
+
+        # for obj2 consider the reference geopandas dataframe if it is given, otherwise use the original geopandas dataframe
+        obj1 = self.prepared_df[self.prepared_df["id"] == id1]
+        if self.prepared_df_ref is None:
+            obj2 = self.prepared_df[self.prepared_df["id"] == id2]
+        else:
+            obj2 = self.prepared_df_ref[self.prepared_df_ref["id"] == id2]
+
+        # calculate the euclidean distance between the two objects
+        dist = euclidean_distances(obj1[self.columns], obj2[self.columns])
+        return dist[0][0]
+
     def calculate_similarity(self, id1, id2):
         dist = self.calculate_distance(id1, id2)
         if self.column_weights is not None: #TODO: move this to calculate_distance
@@ -195,6 +210,7 @@ class similarity:
             if isinstance(output_path, str) and matrix.ndim > 1 and matrix.shape[0] % save_interval == 0:
                 self.save(matrix, output_path, header, '%s')
 
+        progress.close()
         # make sure the full matrix is saved, or just return the matrix
         if isinstance(output_path, str):
             self.save(matrix, output_path, header, fmt=fmt)
