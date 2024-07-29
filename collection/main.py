@@ -35,11 +35,7 @@ class collection():
             os.makedirs(self._bag_data_folder)
         elif not os.path.isdir(self._bag_data_folder):
             raise ValueError("The bag_data_folder should be a directory, not a file.")
-        elif len(os.listdir(self._bag_data_folder)) > 1:
-            print("WARNING: the bag_data folder is not empty, the data will be overwritten if it already exists")
-        elif len(os.listdir(self._bag_data_folder)) == 1 and os.path.exists(f"{self.bag_data_folder}/.gitkeep") == False:
-            print("WARNING: the bag_data folder is not empty, the data will be overwritten if it already exists")
-        # else: the folder is empty, so no warning is needed
+        # else: the folder is there already
 
     def collect_id_list(self, all_ids: list):
         """Requests and save the data in cityjson format for all the ids in the list."""
@@ -60,7 +56,7 @@ class collection():
 
         # check how many requests are needed
         if existing_files == len(all_ids):
-            print("All the requested data is already saved, no new requests are needed.")
+            print("All the requested data is already saved on the machine, no new requests are needed.")
             return
         elif existing_files > 0:
             print(f"{existing_files} out of {len(all_ids)} files already exist, so {len(all_ids) - existing_files} more request(s) are needed.")
