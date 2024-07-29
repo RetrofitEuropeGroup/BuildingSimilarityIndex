@@ -26,7 +26,7 @@ class similarity:
         self.feature_space_path = feature_space_path
         self.fs_df = pd.read_csv(feature_space_path)
 
-        # needed to know which columns are relevant for the distance calculation, and if the columns should be scaled
+        # needed to know which columns are relevant for the distance calculation, and if the columns should be weighted
         self.columns = self._get_columns(column_weights, columns)
         self.column_weights = column_weights
 
@@ -53,9 +53,9 @@ class similarity:
     def _prepare_data(self, df):
         normalized_df = self._normalize(df)
 
-        # scale only if needed (if column_weights is given)
+        # weighted columns only if needed (if column_weights is given)
         if self.column_weights is not None:
-            prepared_df = self._scale(normalized_df)
+            prepared_df = self._weighted_columns(normalized_df)
         else:
             prepared_df = normalized_df
         return prepared_df
@@ -71,19 +71,17 @@ class similarity:
                 prepared_df[column] = (prepared_df[column] - prepared_df[column].mean()) / prepared_df[column].std()
             except Exception as e:
                 raise ValueError(f"Could not normalize column: {column}. Error: {e}")
-        
         return prepared_df
     
-    def _scale(self, df):
-        """scale the columns in the dataframe according to the given weights, so that the features have different weights in the distance calculation"""
-        scaled_df = df.copy()
+    def _weighted_columns(self, df):
+        """make the columns weighted by multiplying the values with the weights. This will result in some features having a larger impact on distance calculation"""
+        weighted_df = df.copy()
         for column, weight in self.column_weights.items():
-            scaled_df[column] = df[column] * weight
-        return scaled_df
+            weighted_df[column] = df[column] * weight
+        return weighted_df
 
     ## main functions
     # function to calculate the distance between two objects
-    #TODO: use this or remove it
     def _check_ids(self, id1, id2):
         # check if the ids are in the correct format
         if not id1.startswith("NL.IMBAG.Pand."):
