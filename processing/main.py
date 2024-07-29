@@ -77,6 +77,7 @@ class processing():
             self._merge_files()
 
         # calculate the 2d / 3d metrics and turning funciton features
+        # TODO: create a single progress bar
         self.feature_space = self._create_feature_space()
         self.feature_space.to_csv(self.output_file)
 
