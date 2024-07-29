@@ -144,7 +144,6 @@ class similarity:
         plt.show()
 
     def calculate_distance(self, id1, id2):
-        # TODO: make something for categorical columns
         id1, id2 = self._check_ids(id1, id2)
 
         # for obj2 consider the reference geopandas dataframe if it is given, otherwise use the original geopandas dataframe
