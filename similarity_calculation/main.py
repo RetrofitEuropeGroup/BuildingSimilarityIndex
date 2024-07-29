@@ -209,8 +209,8 @@ class similarity:
             # save the matrix to a file if the interval is reached
             if isinstance(output_path, str) and matrix.ndim > 1 and matrix.shape[0] % save_interval == 0:
                 self.save(matrix, output_path, header, '%s')
-
         progress.close()
+
         # make sure the full matrix is saved, or just return the matrix
         if isinstance(output_path, str):
             self.save(matrix, output_path, header, fmt=fmt)
@@ -248,7 +248,8 @@ class similarity:
             if isinstance(output_path, str) and matrix.ndim > 1 and matrix.shape[0] % save_interval == 0:
                 self.save(matrix, output_path, header)
                 #TODO: just append the new rows to the file instead of saving the whole matrix
-        
+        progress.close()
+
         # make sure the full matrix is saved
         if isinstance(output_path, str):
             mirrored_matrix = self.save(matrix, output_path, header)
