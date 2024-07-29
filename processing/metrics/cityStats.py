@@ -102,7 +102,7 @@ def clean_df(df, output):
     clean = clean[clean['hole_count'] == 0]
     rows_lost_perc = (len(df) - len(clean)) / len(df)
     if rows_lost_perc > 0.2:
-        print(f'WARNING: {rows_lost_perc:.2%} of the buildings has been deleted as it did not meet on of the following three requirements: actual_volume is bigger than convex_hull_volume, actual_volume is lager than 40, hole_count is zero')
+        print(f'WARNING: {rows_lost_perc:.2%} of the buildings has been deleted as it did not meet on of the following three requirements: actual_volume is bigger than convex_hull_volume, actual_volume is larger than 40, hole_count is zero')
 
 
     ## filter out the buildings with index values out of the range
