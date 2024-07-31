@@ -2,6 +2,7 @@ import sys
 import json
 import os
 import asyncio
+import requests
 
 parent_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_dir)
@@ -63,12 +64,19 @@ class collection():
         
         ## make the urls for the async requests
         all_urls = [f"https://api.3dbag.nl/collections/pand/items/NL.IMBAG.Pand.{id}" for id in request_ids]
-        result = asyncio.run(request_url_list(all_urls))
+        if asyncio.get_event_loop().is_running():
+            print("Asyncio is already running, so the requests will be done synchronously. Note that this is not the most efficient way.")
+            for url in all_urls:
+                r = requests.get(url)
+                cityjson = self._convert_to_cityjson(r.json())
+                self._save(cityjson, request_ids[all_urls.index(url)])
+        else:
+            result = asyncio.run(request_url_list(all_urls))
 
-        # convert to the right format and save the data, this is not async because the data is already fetched
-        for i, data in enumerate(result):
-            cityjson = self._convert_to_cityjson(data)
-            self._save(cityjson, all_ids[i])
+            # convert to the right format and save the data, this is not async because the data is already fetched
+            for i, data in enumerate(result):
+                cityjson = self._convert_to_cityjson(data)
+                self._save(cityjson, all_ids[i])
 
 if __name__ == "__main__":
     import geopandas as gpd
