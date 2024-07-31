@@ -12,15 +12,15 @@ from metrics.cityStats import calculate_metrics
 from turning_functions.main import perform_turning_function
 
 class processing():
-    def __init__(self, output_file: str, bag_data_folder: str = None, cityjson_file: str = None, categorical_columns: list = None):
+    def __init__(self, feature_space_file: str, bag_data_folder: str = None, cityjson_file: str = None, categorical_columns: list = None):
         """
         Initializes an instance of the class that is used to process the data. Processing the data consists of 
         two steps: merging the files in the input folder to a single file (1) and creating a feature space from the merged file.
         The feature space is a pandas dataframe that contains the 2D and 3D metrics and the turning function features, other
-        variables could be added as well. It saves the feature space to a csv file in the output_file and saves it to self.feature_space
+        variables could be added as well. It saves the feature space to a csv file in the feature_space_file and saves it to self.feature_space
 
         Args:
-            output_file (str): The path to the output file where the processed data (feature space) will be saved.
+            feature_space_file (str): The path to the output file where the processed data (=feature space) will be saved.
             bag_data_folder (str, optional): The path to the folder containing cityjson with a single building, source is from the BAG. Defaults to None.
             cityjson_file (str, optional): The path to the CityJSON file with a single or multiple buildings. Defaults to None.
             categorical_columns (list, optional): A list of column names that are categorical, these columns will get distance 1/num_categories if they are not equal and 0 if they are. Defaults to None.
@@ -29,22 +29,22 @@ class processing():
         self._bag_data_folder = bag_data_folder
         self._cityjson_file = cityjson_file
         self._categorical_columns = categorical_columns
-        self._set_output_file(output_file)
+        self._set_feature_space_file(feature_space_file)
 
         if bag_data_folder is None and cityjson_file is None:
             raise ValueError("Either input_folder or cityjson_file should be provided")
         elif bag_data_folder is not None and cityjson_file is not None:
             raise ValueError("It is not possible to use both bag_data_folder and cityjson_file")
 
-    def _set_output_file(self, file_path: str):
+    def _set_feature_space_file(self, file_path: str):
         if file_path.endswith('.csv') == False:
-            raise ValueError("The output_file can only be a .csv file")
+            raise ValueError("The feature_space_file can only be a .csv file")
         else:
             parent_dir = os.path.dirname(file_path)
             if not os.path.exists(parent_dir) and parent_dir != '': # if the parent directory does not exist, create it
                 os.makedirs(parent_dir)
 
-            self.output_file = file_path        
+            self.feature_space_file = file_path        
 
     # main functions
     def _merge_files(self):
@@ -83,12 +83,12 @@ class processing():
         if self._categorical_columns is not None:
             self.feature_space = pd.get_dummies(self.feature_space, columns=self._categorical_columns, dtype=int)
         
-        self.feature_space.to_csv(self.output_file)
+        self.feature_space.to_csv(self.feature_space_file)
 
 if __name__ == '__main__':
-    p = processing(output_file="data/feature_space/test_processing.csv", bag_data_folder="data/bag_data", categorical_columns=['random_cat'])
+    p = processing(feature_space_file="data/feature_space/test_processing.csv", bag_data_folder="data/bag_data", categorical_columns=['random_cat'])
     p.run()
     
     import pandas as pd
-    df = pd.read_csv(p.output_file)
+    df = pd.read_csv(p.feature_space_file)
     print(df.head())
