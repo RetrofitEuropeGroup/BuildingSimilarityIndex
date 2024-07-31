@@ -14,8 +14,8 @@ class collection():
     and it request it from the 3D-BAG, then it saves the data in cityjson format to the bag_data folder.
     """
 
-    def __init__(self):
-        self._bag_data_folder = 'data/bag_data'
+    def __init__(self, bag_data_folder: str):
+        self._bag_data_folder = bag_data_folder
 
     def _convert_to_cityjson(self, data: dict):
         """Converts the data (that is collected with the API request) to CityJSON format."""
@@ -39,6 +39,7 @@ class collection():
         # else: the folder is there already
 
     def collect_id_list(self, all_ids: list):
+        # TODO: check if exists with different id formats
         """Requests and save the data in cityjson format for all the ids in the list."""
 
         self._check_bag_data_folder()
