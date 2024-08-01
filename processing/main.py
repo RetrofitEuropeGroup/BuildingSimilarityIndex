@@ -44,7 +44,7 @@ class processing():
     # main functions
     def _merge_files(self):
         """ Merges the files in the input folder to a single file"""
-        merge_folder = Path(self._bag_data_folder.replace('bag_data', 'bag_data_merged')) # create a new folder, if needed, for the merged files
+        merge_folder = Path(self._bag_data_folder + '_merged') # create a new folder, if needed, for the merged files
         merger = MergeCityJSON(self._bag_data_folder, output_folder=merge_folder)
         merger.run()
 
