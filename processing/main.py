@@ -69,6 +69,8 @@ class processing():
 
     def run(self):
         # merge if a folder has been provided
+        if len(os.listdir(self._bag_data_folder)) == 0:
+            raise Exception("The bag_data_folder is empty, please provide a folder with cityjson files")
         if self._bag_data_folder is not None:
             self._merge_files()
 
