@@ -14,8 +14,9 @@ class collection():
     and it request it from the 3D-BAG, then it saves the data in cityjson format to the bag_data folder.
     """
 
-    def __init__(self, bag_data_folder: str):
+    def __init__(self, bag_data_folder: str, verbose: bool = False):
         self._bag_data_folder = bag_data_folder
+        self._verbose = verbose # TODO: integrate this in the request function
 
     def _convert_to_cityjson(self, data: dict):
         """Converts the data (that is collected with the API request) to CityJSON format."""
@@ -68,9 +69,14 @@ class collection():
         if asyncio.get_event_loop().is_running():
             print("Asyncio is already running, so the requests will be done synchronously. Note that this is not the most efficient way.")
             for url in all_urls:
-                r = requests.get(url)
-                cityjson = self._convert_to_cityjson(r.json())
-                self._save(cityjson, request_ids[all_urls.index(url)])
+                try:
+                    r = requests.get(url)
+                    cityjson = self._convert_to_cityjson(r.json())
+                    self._save(cityjson, request_ids[all_urls.index(url)])
+                except:
+                    error_count += 1
+            if self._verbose:
+                print(f"{error_count} errors occurred while requesting the data.")
         else:
             result = asyncio.run(request_url_list(all_urls))
 
@@ -78,15 +84,6 @@ class collection():
             for i, data in enumerate(result):
                 cityjson = self._convert_to_cityjson(data)
                 self._save(cityjson, all_ids[i])
-
-if __name__ == "__main__":
-    import geopandas as gpd
-    df = gpd.read_file("testcase_overvecht/BSI_overvecht.gpkg", layer='pand')
-    all_ids = df['identificatie'].tolist()
-
-    start_id = 0
-    step = 100
-    for i in range(start_id, len(all_ids), step):
-        c = collection()
-        c.collect_id_list(all_ids[i:i+step])
-        print(f'Processed building {i} to {i+step} out of total {len(all_ids)} buildings')
+            if self._verbose:
+                print(f"{len(all_urls)-len(result)} errors occurred while requesting the data.")
+        

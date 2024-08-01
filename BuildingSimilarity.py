@@ -20,6 +20,6 @@ class BuildingSimilarity():
                 column_weights: dict = None,
                 columns: list = None,
                 verbose: bool = False):
-        self.collection = collection(bag_data_folder)
+        self.collection = collection(bag_data_folder, verbose)
         self.processing = processing(feature_space_file, bag_data_folder, categorical_columns, verbose)
         self.similarity = similarity(feature_space_file, columns, column_weights)
