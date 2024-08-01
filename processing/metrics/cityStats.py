@@ -2,17 +2,17 @@ import json
 import os
 import sys
 import math
-import subprocess
 
 import numpy as np
 import pandas as pd
 import geopandas
 import pyvista as pv
 import scipy.spatial as ss
+
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-# add the path of the own directory to the system path so that the modules can be imported
+# add the path of the own directory to the system path so that our own modules can be imported
 file_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(file_dir)
 
@@ -74,41 +74,20 @@ def get_errors_from_report(report, objid, cm):
                 return False
     return False
 
-def save_filter_stats(outfiltered_2d, outfiltered_3d, output):
-    # split the output path to get the output folder
-    output_folder_parts = os.path.split(output)[:-1]
-    logger_path = os.path.join(*output_folder_parts, "filtered_buildings.csv")
-
-    output_name = os.path.split(output)[-1]
-
-    # update the logger
-    #TODO: make this an option
-    new_line = f'{output_name};{round(outfiltered_2d, 4)};{round(outfiltered_3d, 4)}\n'
-    if os.path.exists(logger_path) == False:
-        with open(logger_path, 'w') as f:
-            f.write('output_filename;filtered_2d;filtered_3d\n')
-    with open(logger_path, 'a') as f:
-        f.write(new_line)
-
-
-def clean_df(df, output):
-    """Cleans the dataframe, it removes the buildings with errors,
-    holes, and buildings with index values out of the normal range."""
+def check_suitability(df):
     ## filter based on some conditions
     # filter out the buldings with actual_volume lower than 40, no holes
     # and actual volume larger than convex hull volume
-    clean = df[df['actual_volume'] < df['convex_hull_volume']]
-    clean = clean[clean['actual_volume'] >= 40]
-    clean = clean[clean['hole_count'] == 0]
-    rows_lost_perc = (len(df) - len(clean)) / len(df)
-    if rows_lost_perc > 0.2:
-        print(f'WARNING: {rows_lost_perc:.2%} of the buildings has been deleted as it did not meet on of the following three requirements: actual_volume is bigger than convex_hull_volume, actual_volume is larger than 40, hole_count is zero')
+    clean = df[(df['actual_volume'] < df['convex_hull_volume']) & (df['actual_volume'] >= 40) & (df['hole_count'] == 0)]
+    perc_convex = len(df.query('actual_volume > convex_hull_volume')) / len(df)
+    perc_vol40 = len(df.query('actual_volume < 40')) / len(df)
+    perc_holes = len(df.query('hole_count > 0')) / len(df)
+    return clean, perc_convex, perc_vol40, perc_holes
 
-
-    ## filter out the buildings with index values out of the range
+def check_metric_values(clean, df):
+    """filters out the buildings with index values out of the range (0-1.2)"""
     # start with determining which indices are 2d and 3d
     indices_2d = [col for col in df.columns if col.endswith("_2d")] + ["horizontal_elongation"]
-
     indices_3d = ([col for col in df.columns if col.endswith("_3d")] +
                 ["horizontal_elongation"])
 
@@ -116,27 +95,31 @@ def clean_df(df, output):
     min_value = 0
     max_value = 1.2
 
-    before2d = len(clean)
+    before = len(clean)
     for ind in indices_2d:
         clean = clean[(clean[ind] >= min_value) & (clean[ind] <= max_value)]
-    after2d = len(clean)
-    before3d = len(clean)
     for ind in indices_3d:
         clean = clean[(clean[ind] >= min_value) & (clean[ind] <= max_value)]
-    outfiltered_2d = (before2d - after2d) / before2d
-    outfiltered_3d = (before3d - len(clean)) / before3d
+    outfiltered_metrics = (before - len(clean)) / len(df)
+    return clean, outfiltered_metrics   
 
-    # TODO: make a logger that prints the percentage of buildings that are filtered out, and due to what cause
-    if output is not None:
-        save_filter_stats(outfiltered_2d, outfiltered_3d, output)
+def clean_df(df, verbose=True):
+    """Cleans the dataframe, it removes the buildings with errors,
+    holes, and buildings with index values out of the normal range."""
+    # check the suitability of the buildings based on 3 conditions
+    clean, perc_convex, perc_vol40, perc_holes = check_suitability(df)
+    clean = clean.drop(columns=["hole_count", 'min_vertical_elongation', 'max_vertical_elongation'], axis=1)
     
-    # filter out the irrelevant columns
-    irrelevant_columns = ["type", "lod", "errors", "valid", "orientation_values", "orientation_edges",
-                          "hole_count", 'min_vertical_elongation', 'max_vertical_elongation']
-    for col in irrelevant_columns:
-        if col in clean.columns:
-            clean = clean.drop(columns=col)
+    clean, outfiltered_metrics = check_metric_values(clean, df)
 
+    # let the user know how many buildings have been filtered out
+    rows_lost_perc = 1 - len(clean) / len(df)
+    if verbose:
+        print(f"""INFO: {rows_lost_perc:.2%} of the buildings has been filtered out as it did not meet one of the requirements:
+        {perc_convex:.2%} \t has a actual_volume that is larger than convex_hull_volume
+        {perc_vol40:.2%} \t has an actual_volume smaller than 40
+        {perc_holes:.2%} \t has a hole_count that is not zero
+        {outfiltered_metrics:.2%} \t has metrics values out of the normal range""")
     return clean
 
 def eligible(cm, id, report):
@@ -348,7 +331,8 @@ def calculate_metrics(input,
          without_indices=False,
          jobs=1,
          density_2d=1.0,
-         density_3d=1.0):
+         density_3d=1.0,
+         verbose=False):
     """Uses a cityjson file to calculate the 2d / 3d metrics for the buildings in the cityjson file"""
 
     with open(input, "r") as f:
@@ -407,7 +391,7 @@ def calculate_metrics(input,
             futures.append(future)
 
         # wait for the jobs to finish and add the results to the stats
-        with tqdm(total=total_jobs) as progress:
+        with tqdm(total=total_jobs, desc="Calculating the 2D & 3D metrics") as progress:
             stats = {}
             for future in as_completed(futures):
                 # retrieve the result
@@ -420,9 +404,9 @@ def calculate_metrics(input,
     df.index.name = "id"
 
     try:
-        clean = clean_df(df, output_path)
+        clean = clean_df(df, verbose)
     except Exception as e:
-        print(f"ERROR: Problem with cleaning the dataframe: {e}")
+        print(f"ERROR: Problem with cleaning the dataframe, using the original. Error message: {e}")
         clean = df
 
     try:

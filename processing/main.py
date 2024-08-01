@@ -12,7 +12,7 @@ from metrics.cityStats import calculate_metrics
 from turning_functions.main import perform_turning_function
 
 class processing():
-    def __init__(self, feature_space_file: str, bag_data_folder: str = None, categorical_columns: list = None):
+    def __init__(self, feature_space_file: str, bag_data_folder: str = None, categorical_columns: list = None, verbose: bool = False):
         """
         Initializes an instance of the class that is used to process the data. Processing the data consists of 
         two steps: merging the files in the input folder to a single file (1) and creating a feature space from the merged file.
@@ -23,11 +23,13 @@ class processing():
             feature_space_file (str): The path to the output file where the processed data (=feature space) will be saved.
             bag_data_folder (str, optional): The path to the folder containing multiple cityjson files with a single building, source is from the BAG. Defaults to None.
             categorical_columns (list, optional): A list of column names that are categorical, these columns will get distance 1/num_categories if they are not equal and 0 if they are. Defaults to None.
+            verbose (bool, optional): If True, the progress will be printed. Defaults to False.
         """
 
         self._bag_data_folder = bag_data_folder
         self._categorical_columns = categorical_columns
         self._set_feature_space_file(feature_space_file)
+        self._verbose = verbose
 
     def _set_feature_space_file(self, file_path: str):
         if file_path.endswith('.csv') == False:
@@ -54,7 +56,7 @@ class processing():
         n_processors = max(os.cpu_count() - 1, 1)
 
         # run the citystats script in which the metrics are calculated
-        feature_space_metrics = calculate_metrics(input=self._merged_file, jobs=n_processors)
+        feature_space_metrics = calculate_metrics(input=self._merged_file, jobs=n_processors, verbose=self._verbose)
 
         # execute the turning function
         feature_space_tf = perform_turning_function(feature_space_metrics)

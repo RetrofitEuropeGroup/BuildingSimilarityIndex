@@ -247,7 +247,7 @@ def polygon_to_new_space(pol, feature_space, additional_functions=[convexity, re
 def make_space(pol_list, features, additional_functions=[convexity, rectangularity], metric='l1'):
     """make_space: constructs feature space from list of polygons. See polygon_to_new_space for details on how each instance is transformed to the feature space."""
     res = np.zeros((len(pol_list),len(features)))
-    for i in tqdm(range(len(pol_list))):
+    for i in tqdm(range(len(pol_list)), desc="Executing the turning function "):
         res[i,:] = polygon_to_new_space(pol_list[i], feature_space=features, additional_functions=additional_functions, metric=metric)
     return res
 
