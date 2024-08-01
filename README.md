@@ -9,7 +9,7 @@
   </a>
 </p>
 
-A Python library based on [3d-building-metrics repo](https://github.com/tudelft3d/3d-building-metrics) to create a pipeline for the comparison of buildings. The library automatically collects the data from the [3D-BAG](https://docs.3dbag.nl/en/) and compares building based on the results of a turning function and metrics from the 3d-building-metrics repo. It consists of three modules: collection, processing and similarity_calculation. 
+A Python library based on [3d-building-metrics repo](https://github.com/tudelft3d/3d-building-metrics) to create a pipeline for the comparison of buildings. The library automatically collects the data from the [3D-BAG](https://docs.3dbag.nl/en/) and compares building based on the results of a turning function and metrics from the 3d-building-metrics repo. It consists of three modules: collection, processing and similarity_calculation. The modules are combined in one large module: BuildingsSimilarity. 
 
 The <b>collection</b> module downloads cityjson from the 3D-BAG based on a list of [BAG IDs](https://www.geobasisregistraties.nl/basisregistraties/adressen-en-gebouwen). The <b>processing</b> module processes the buildings by merging the downloaded cityjson, calculating 2D/3D metrics, filtering out unsuitable buildings (based on abnormal metric values) and a turning function. Its output is a geopackage with the BAG IDs and the metrics. Finally the calculates the <b>similarity_calculation</b> module calculates the distance between buildings. This can be the distance between two individual buildings or multiple buildings at once.
 
@@ -18,12 +18,7 @@ The <b>collection</b> module downloads cityjson from the 3D-BAG based on a list 
 - python >=3.10
 
 ## Usage
-All modules can be used individually. The main.py file in the root folder serves as an example of how to use the modules together.
-
-```bash
-python main.py
-```
-
+All modules can be used individually but are combined in BuildingSimilarity. Go to the demo directory for an idea of how to use the module.
 
 ## Installation
 
@@ -72,7 +67,6 @@ cp val3dity/build/val3dity FF_BuildingSimilarityIndex/processing/metrics/val3dit
 cd FF_BuildingSimilarityIndex
 pip install -r requirements.txt
 ```
-
 
 
 ## Show your support
