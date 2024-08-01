@@ -66,7 +66,6 @@ class collection():
                 request_ids.append(id)
 
         # check how many requests are needed
-        print(existing_files, len(all_ids), request_ids)
         if existing_files == len(all_ids):
             print("All the requested data is already saved on the machine, no new requests are needed.")
             return
