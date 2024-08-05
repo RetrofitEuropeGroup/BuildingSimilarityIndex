@@ -3,6 +3,9 @@ import json
 import os
 import asyncio
 import requests
+import dotenv
+
+dotenv.load_dotenv()
 
 parent_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_dir)
@@ -18,12 +21,19 @@ class collection():
         self._bag_data_folder = bag_data_folder
         self._verbose = verbose # TODO: integrate this in the request function
 
-    def _convert_to_cityjson(self, data: dict):
+    def _convert_to_cityjson(self, data: dict, bag_attributes):
         """Converts the data (that is collected with the API request) to CityJSON format."""
         cityjson = data['metadata']
         cityjsonfeature = data['feature']
         cityjson['CityObjects'] = cityjsonfeature['CityObjects']
         cityjson['vertices'] = cityjsonfeature['vertices']
+
+        if bag_attributes is not None:
+            bag_id = list(cityjson['CityObjects'].keys())[0] 
+
+            cityjson['CityObjects'][bag_id]['attributes']['totaal_oppervlakte'] = bag_attributes.get("totaal_oppervlakte")
+            cityjson['CityObjects'][bag_id]['attributes']['aantal_verblijfsobjecten'] = bag_attributes.get("aantal_verblijfsobjecten")
+            cityjson['CityObjects'][bag_id]['attributes']['gebruiksdoelen'] = bag_attributes.get("gebruiksdoelen")
         return cityjson
 
     def _make_url(self, id: str):
@@ -48,6 +58,48 @@ class collection():
         elif not os.path.isdir(self._bag_data_folder):
             raise ValueError("The bag_data_folder should be a directory, not a file.")
         # else: the folder is there already
+    
+    def _process_bag_result(self, result: dict):
+        all_atributes = []
+        for bag_obj in result:
+            # get the adressen and their info
+            adressen = bag_obj.get('_embedded', {}).get('adressen')
+            if adressen is None:
+                print(f"Could not find adressen in the response json: {bag_obj}")
+                return []
+            
+            # loop over the adresses to get the relevant information
+            total_oppervlakte = 0
+            gebruiksdoelen = []
+            for adres in adressen:
+                gebruiksdoelen_single_obj = adres.get('gebruiksdoelen', [])
+                gebruiksdoelen.extend(gebruiksdoelen_single_obj)
+
+                oppervlakte = adres.get('oppervlakte')
+                if oppervlakte is None:
+                    print(f'Surface cannot be found for adres: {adres}')
+                else:
+                    total_oppervlakte += oppervlakte
+            if gebruiksdoelen == []:
+                print(f'Could not identify the purpose of use for bag object: {bag_obj}')
+            attributes = {'totaal_oppervlakte': total_oppervlakte, 'aantal_verblijfsobjecten': len(adressen), 'gebruiksdoelen': gebruiksdoelen} 
+            all_atributes.append(attributes)
+        return attributes
+
+    def _get_bag_attributes(self, all_ids: list):
+        # construct the header & parameters
+        key = os.environ.get('BAG_API_KEY')
+        headers = {'X-Api-Key':key, 'Accept-Crs': 'EPSG:28992'}
+        all_params = [{'pandIdentificatie':id} for id in all_ids]
+
+        # url is the same for every request
+        url = 'https://api.bag.kadaster.nl/lvbag/individuelebevragingen/v2/adressenuitgebreid'
+        all_urls = [url] * len(all_ids)
+
+        # request the data & process the result
+        result = asyncio.run(request_url_list(all_urls, headers=headers, params=all_params))
+        extracted_bag_data = self._process_bag_result(result)
+        return extracted_bag_data
 
     def collect_id_list(self, all_ids: list):
         """Requests and save the data in cityjson format for all the ids in the list."""
@@ -90,10 +142,11 @@ class collection():
         else:
             all_urls = [self._make_url(id) for id in request_ids]
             result = asyncio.run(request_url_list(all_urls))
+            bag_attributes = self._get_bag_attributes(all_ids)
 
             # convert to the right format and save the data, this is not async because the data is already fetched
             for i, data in enumerate(result):
-                cityjson = self._convert_to_cityjson(data)
+                cityjson = self._convert_to_cityjson(data, bag_attributes)
                 self._save(cityjson, request_ids[i]) # use request_ids to get the right id without the pre- and suffix
             if self._verbose:
                 print(f"{len(all_urls)-len(result)} errors occurred while requesting the data.")

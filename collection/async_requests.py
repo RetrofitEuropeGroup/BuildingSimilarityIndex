@@ -4,8 +4,8 @@ import aiohttp
 from tqdm import tqdm
 
 ### Async requests
-async def fetch(session, task, headers, payload):  # fetching urls and mark result of execution
-    async with session.get(task['url'], headers=headers, data=payload) as response:
+async def fetch(session, task, headers, payload, params={}):  # fetching urls and mark result of execution
+    async with session.get(task['url'], headers=headers, data=payload, params=params) as response:
         if response.status == 200:
             task['result'] =  await response.json()  # just to be sure we acquire data
             task['status'] = 'done'
@@ -20,9 +20,10 @@ async def fetch(session, task, headers, payload):  # fetching urls and mark resu
             await asyncio.sleep(retry_after) # try again after waiting
             await fetch(session, task, headers, payload) # try again with a recursive call
         else:
-            print(f"Error {response.status} while fetching url {task['url']}")
+            error_msg = await response.text()
+            print(f"Error {response.status} while fetching url {task['url']}. Text: {error_msg}")
             task['status'] = 'error'
-            task['error message'] = await response.text()
+            task['error message'] = error_msg
 
 def extract_results(url_tasks):
     all_results = []
@@ -49,7 +50,7 @@ def update_bar(t, previous_progress, url_tasks):
     previous_progress = current_progress
     return previous_progress
 
-async def request_url_list(all_urls, headers={}, payload={}, requests_persecond=50, max_active_tasks=500):
+async def request_url_list(all_urls, headers={}, payload={}, params=[], requests_persecond=50, max_active_tasks=500):
     try:
         async with aiohttp.ClientSession() as session:
             # convert to list of dicts
@@ -79,7 +80,10 @@ async def request_url_list(all_urls, headers={}, payload={}, requests_persecond=
                 # starting the task
                 url_tasks[index]['status'] = 'fetch'
                 started_tasks_this_second += 1
-                asyncio.create_task(fetch(session, task, headers, payload))
+                if params:
+                    asyncio.create_task(fetch(session, task, headers, payload, params[index]))
+                else:
+                    asyncio.create_task(fetch(session, task, headers, payload))
 
             # loop until all tasks are done or error
             while tasks_to_wait(url_tasks) != 0:
