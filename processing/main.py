@@ -81,11 +81,3 @@ class processing():
             self.feature_space = pd.get_dummies(self.feature_space, columns=self._categorical_columns, dtype=int)
         
         self.feature_space.to_csv(self.feature_space_file)
-
-if __name__ == '__main__':
-    p = processing(feature_space_file="data/feature_space/test_processing.csv", bag_data_folder="data/bag_data", categorical_columns=['random_cat'])
-    p.run()
-    
-    import pandas as pd
-    df = pd.read_csv(p.feature_space_file)
-    print(df.head())
