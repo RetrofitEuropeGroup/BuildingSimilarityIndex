@@ -22,4 +22,4 @@ class BuildingSimilarity():
                 verbose: bool = False):
         self.collection = collection(bag_data_folder, verbose)
         self.processing = processing(feature_space_file, bag_data_folder, categorical_columns, verbose)
-        self.similarity = similarity(feature_space_file, columns, column_weights)
+        self.similarity = similarity(feature_space_file, column_weights, columns)
