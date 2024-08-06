@@ -118,6 +118,7 @@ class collection():
     #     return extracted_bag_data
 
     def _get_bag_attributes(self, request_ids: list):
+        #TODO: make it optional to use the bag
         
         url = 'https://api.bag.kadaster.nl/lvbag/individuelebevragingen/v2/adressenuitgebreid'
         key = os.environ.get('BAG_API_KEY')
@@ -126,14 +127,14 @@ class collection():
 
         all_attributes = {}
         for id in tqdm(request_ids, desc='Getting the BAG data'):
-            # try:
-            params = {'pandIdentificatie':id}
-            r = requests.get(url, params=params, headers=headers).json()
-            attributes = self._process_bag_result(r, id)
-            all_attributes[id] = attributes
-            # except Exception as e:
-            #     print(f"Error for id {id}, msg: {e}")
-            #     all_attributes[id] = {}
+            try:
+                params = {'pandIdentificatie':id}
+                r = requests.get(url, params=params, headers=headers).json()
+                attributes = self._process_bag_result(r, id)
+                all_attributes[id] = attributes
+            except Exception as e:
+                print(f"Error while getting the information for id {id} from {url}. \n Error message: {e}")
+                all_attributes[id] = {}
         return all_attributes
 
     def collect_id_list(self, all_ids: list):
