@@ -65,6 +65,15 @@ class processing():
         feature_space_merged = feature_space_metrics.merge(feature_space_tf, on='id')
         feature_space_merged.drop(columns=['geometry'], inplace=True) # drop the geometry column as it is a shapely object and cannot be saved to a csv file
 
+        dropped_columns = []
+        for col in feature_space_merged.columns:
+            if feature_space_merged[col].dtype == bool:
+                feature_space_merged[col] = feature_space_merged[col].astype(int)
+            if max(feature_space_merged[col]) == min(feature_space_merged[col]):
+                dropped_columns.append(col)
+                feature_space_merged.drop(columns=col, inplace=True)
+        if len(dropped_columns) > 0:
+            print(f"WARNING: column(s) {','.join(dropped_columns)} have/has will be ignored as all values are the same")
         return feature_space_merged
 
     def run(self):
@@ -79,5 +88,5 @@ class processing():
         self.feature_space = self._create_feature_space()
         if self._categorical_columns is not None:
             self.feature_space = pd.get_dummies(self.feature_space, columns=self._categorical_columns, dtype=int)
-        
+
         self.feature_space.to_csv(self.feature_space_file)
