@@ -4,6 +4,7 @@ import os
 import asyncio
 import requests
 import dotenv
+from tqdm import tqdm
 
 dotenv.load_dotenv()
 
@@ -21,19 +22,17 @@ class collection():
         self._bag_data_folder = bag_data_folder
         self._verbose = verbose # TODO: integrate this in the request function
 
-    def _convert_to_cityjson(self, data: dict, bag_attributes):
+    def _convert_to_cityjson(self, data: dict, bag_attributes: dict, id):
         """Converts the data (that is collected with the API request) to CityJSON format."""
         cityjson = data['metadata']
         cityjsonfeature = data['feature']
         cityjson['CityObjects'] = cityjsonfeature['CityObjects']
         cityjson['vertices'] = cityjsonfeature['vertices']
 
-        if bag_attributes is not None:
-            bag_id = list(cityjson['CityObjects'].keys())[0] 
-
-            cityjson['CityObjects'][bag_id]['attributes']['totaal_oppervlakte'] = bag_attributes.get("totaal_oppervlakte")
-            cityjson['CityObjects'][bag_id]['attributes']['aantal_verblijfsobjecten'] = bag_attributes.get("aantal_verblijfsobjecten")
-            cityjson['CityObjects'][bag_id]['attributes']['gebruiksdoelen'] = bag_attributes.get("gebruiksdoelen")
+        bag_id = f"NL.IMBAG.Pand.{id}"
+        cityjson['CityObjects'][bag_id]['attributes']['totaal_oppervlakte'] = bag_attributes[id].get("totaal_oppervlakte")
+        cityjson['CityObjects'][bag_id]['attributes']['aantal_verblijfsobjecten'] = bag_attributes[id].get("aantal_verblijfsobjecten")
+        cityjson['CityObjects'][bag_id]['attributes']['gebruiksdoelen'] = bag_attributes[id].get("gebruiksdoelen")
         return cityjson
 
     def _make_url(self, id: str):
@@ -59,47 +58,83 @@ class collection():
             raise ValueError("The bag_data_folder should be a directory, not a file.")
         # else: the folder is there already
     
-    def _process_bag_result(self, result: dict):
-        all_atributes = []
-        for bag_obj in result:
-            # get the adressen and their info
-            adressen = bag_obj.get('_embedded', {}).get('adressen')
-            if adressen is None:
-                print(f"Could not find adressen in the response json: {bag_obj}")
-                return []
-            
-            # loop over the adresses to get the relevant information
-            total_oppervlakte = 0
-            gebruiksdoelen = []
-            for adres in adressen:
-                gebruiksdoelen_single_obj = adres.get('gebruiksdoelen', [])
-                gebruiksdoelen.extend(gebruiksdoelen_single_obj)
+    def _process_bag_result(self, result: dict, id):
+        # get the adressen and their info
+        adressen = result.get('_embedded', {}).get('adressen')
+        if adressen is None: #TODO: check why some are missing
+            print(f"Could not find adressen in the response json: {id}")
+            return {}
+        
+        # loop over the adresses to get the relevant information
+        total_oppervlakte = 0
+        gebruiksdoelen = []
+        for adres in adressen:
+            gebruiksdoelen_single_obj = adres.get('gebruiksdoelen', [])
+            gebruiksdoelen.extend(gebruiksdoelen_single_obj)
 
-                oppervlakte = adres.get('oppervlakte')
-                if oppervlakte is None:
-                    print(f'Surface cannot be found for adres: {adres}')
-                else:
-                    total_oppervlakte += oppervlakte
-            if gebruiksdoelen == []:
-                print(f'Could not identify the purpose of use for bag object: {bag_obj}')
-            attributes = {'totaal_oppervlakte': total_oppervlakte, 'aantal_verblijfsobjecten': len(adressen), 'gebruiksdoelen': gebruiksdoelen} 
-            all_atributes.append(attributes)
+            oppervlakte = adres.get('oppervlakte')
+            if oppervlakte is None:
+                print(f'Surface cannot be found for adres: {adres}')
+            else:
+                total_oppervlakte += oppervlakte
+        if gebruiksdoelen == []:
+            print(f"Could not identify the purpose of use for bag object: {id}")
+        attributes = {'totaal_oppervlakte': total_oppervlakte, 'aantal_verblijfsobjecten': len(adressen), 'gebruiksdoelen': gebruiksdoelen} 
         return attributes
 
-    def _get_bag_attributes(self, all_ids: list):
-        # construct the header & parameters
+    # async def _request_bag_data(self, session, id, params, headers):
+    #     url = 'https://api.bag.kadaster.nl/lvbag/individuelebevragingen/v2/adressenuitgebreid'
+    #     async with session.get(url, params=params, headers=headers) as resp:
+    #         try:
+    #             result = await resp.json()
+    #         except Exception as e:
+    #             print(f"Error for {id}, response: {await resp.text()}")
+    #             result = {}
+    #         asyncio.sleep(1) #TODO: find a proper way to limit the request to 50 a second
+    #         if 'bag_id' in result:
+    #             raise Exception("ERROR: already found an id in the result")
+    #         result['bag_id'] = id
+    #         return result
+
+    # async def _async_get_bag_attributes(self, request_ids: list):
+    #     # construct the header & parameters        
+    #     import aiohttp
+    #     connector = aiohttp.TCPConnector(limit=24)
+
+    #     key = os.environ.get('BAG_API_KEY')
+    #     headers = {'X-Api-Key':key, 'Accept-Crs': 'EPSG:28992'}
+
+    #     async with aiohttp.ClientSession(connector=connector) as session:
+    #         tasks = []
+    #         for id in request_ids:
+    #             params = {'pandIdentificatie':id}
+    #             tasks.append(asyncio.ensure_future(self._request_bag_data(session, id, params, headers)))
+        
+    #         task_results = await asyncio.gather(*tasks)
+    #         extracted_bag_data = {}
+    #         for result in task_results:
+    #            attributes = self._process_bag_result(result)
+    #            extracted_bag_data[result['bag_id']] = attributes
+    #     return extracted_bag_data
+
+    def _get_bag_attributes(self, request_ids: list):
+        
+        url = 'https://api.bag.kadaster.nl/lvbag/individuelebevragingen/v2/adressenuitgebreid'
         key = os.environ.get('BAG_API_KEY')
         headers = {'X-Api-Key':key, 'Accept-Crs': 'EPSG:28992'}
-        all_params = [{'pandIdentificatie':id} for id in all_ids]
+        
 
-        # url is the same for every request
-        url = 'https://api.bag.kadaster.nl/lvbag/individuelebevragingen/v2/adressenuitgebreid'
-        all_urls = [url] * len(all_ids)
-
-        # request the data & process the result
-        result = asyncio.run(request_url_list(all_urls, headers=headers, params=all_params))
-        extracted_bag_data = self._process_bag_result(result)
-        return extracted_bag_data
+        all_attributes = {}
+        for id in tqdm(request_ids, desc='Getting the BAG data'):
+            # try:
+            params = {'pandIdentificatie':id}
+            r = requests.get(url, params=params, headers=headers).json()
+            attributes = self._process_bag_result(r, id)
+            all_attributes[id] = attributes
+            # except Exception as e:
+            #     print(f"Error for id {id}, msg: {e}")
+            #     all_attributes[id] = {}
+        return all_attributes
 
     def collect_id_list(self, all_ids: list):
         """Requests and save the data in cityjson format for all the ids in the list."""
@@ -125,14 +160,14 @@ class collection():
             print(f"{existing_files} out of {len(all_ids)} files already exist, so {len(all_ids) - existing_files} more request(s) are needed.")
 
         # if asyncio is running, do the requests synchronously
-        if asyncio.get_event_loop().is_running():
+        if asyncio.get_event_loop().is_running(): #TODO: this doesn't work if you run the class twice
             error_count = 0
             if self._verbose:
                 print("Asyncio is already running, so the requests will be done synchronously. Note that this is not the most efficient way.")
             for id in request_ids: # TODO: add a progress bar
                 try:
                     r = requests.get(self._make_url(id))
-                    cityjson = self._convert_to_cityjson(r.json())
+                    cityjson = self._convert_to_cityjson(r.json(), bag_attributes, id)
                     self._save(cityjson, id)
                 except:
                     error_count += 1
@@ -141,13 +176,15 @@ class collection():
         # if asyncio is not running, use the async function
         else:
             all_urls = [self._make_url(id) for id in request_ids]
+            bag_attributes = self._get_bag_attributes(request_ids)
             result = asyncio.run(request_url_list(all_urls))
-            bag_attributes = self._get_bag_attributes(all_ids)
 
             # convert to the right format and save the data, this is not async because the data is already fetched
-            for i, data in enumerate(result):
-                cityjson = self._convert_to_cityjson(data, bag_attributes)
-                self._save(cityjson, request_ids[i]) # use request_ids to get the right id without the pre- and suffix
-            if self._verbose:
+            for id, data in zip(request_ids, result):
+                if data is None:
+                    continue
+                cityjson = self._convert_to_cityjson(data, bag_attributes, id)
+                self._save(cityjson, id) # use request_ids to get the right id without the pre- and suffix
+            if self._verbose: #TODO: doesn't work anymore as we save all result
                 print(f"{len(all_urls)-len(result)} errors occurred while requesting the data.")
         
