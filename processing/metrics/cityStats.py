@@ -195,6 +195,26 @@ class StatValuesBuilder:
         else:
             self.__values[index_name] = "NC"
 
+def add_purpose_of_use(values, actual_use, id, verbose=False):
+    if len(actual_use) == 0 and verbose:
+        print(f'WARNING: No actual_use (gebruiksdoelen) found for building {id}')
+
+    possible_uses = ['woonfunctie', 'bijeenkomstfunctie', 'celfunctie', 'gezondheidszorgfunctie', 'industriefunctie', 
+    'kantoorfunctie', 'logiesfunctie', 'onderwijsfunctie', 'sportfunctie', 'winkelfunctie',
+    'overige gebruiksfunctie']
+    uses_found = 0
+    # add the possible uses to the dict to make it a seperate column
+    for use in possible_uses:
+        if use in actual_use:
+            uses_found += 1
+            values[use] = True
+        else:
+            values[use] = False
+
+    if uses_found != len(actual_use):
+        print(f'WARNING: Found {uses_found} uses, but expected {len(actual_use)}. actual_use: {actual_use}')
+    return values    
+
 def process_building(building,
                      obj,
                      filter,
@@ -203,7 +223,8 @@ def process_building(building,
                      density_2d,
                      density_3d,
                      vertices,
-                     custom_indices=None):
+                     custom_indices=None,
+                     verbose=False):
 
     if not filter is None and filter != obj:
         return obj, None
@@ -278,10 +299,13 @@ def process_building(building,
         "b3_opp_dak_schuin": building['attributes']['b3_opp_dak_schuin'],
         "b3_opp_grond": building['attributes']['b3_opp_grond'],
         "b3_opp_scheidingsmuur": building['attributes']['b3_opp_scheidingsmuur'],
+        "aantal_verblijfsobjecten": building['attributes'].get("aantal_verblijfsobjecten", []),
+        "totaal_oppervlakte": building['attributes'].get("totaal_oppervlakte"),
         "hole_count": tri_mesh.n_open_edges,
         "geometry": shape,
     }
-
+    purposes = building['attributes'].get("gebruiksdoelen", [])
+    values = add_purpose_of_use(values, np.unique(purposes), obj, verbose)
 
     voxel = pv.voxelize(tri_mesh, density=density_3d, check_surface=False)
     grid = voxel.cell_centers().points
@@ -389,7 +413,8 @@ def calculate_metrics(input,
                                 density_2d,
                                 density_3d,
                                 vertices,
-                                indices_list)
+                                indices_list,
+                                verbose)
             futures.append(future)
 
         # wait for the jobs to finish and add the results to the stats
