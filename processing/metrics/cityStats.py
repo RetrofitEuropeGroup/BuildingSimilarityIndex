@@ -211,7 +211,7 @@ def add_purpose_of_use(values, actual_use, id, verbose=False):
         else:
             values[use] = False
 
-    if uses_found != len(actual_use):
+    if uses_found != len(actual_use) and actual_use != [None] and len(actual_use) != 0:
         print(f'WARNING: Found {uses_found} uses, but expected {len(actual_use)}. actual_use: {actual_use}')
     return values    
 
