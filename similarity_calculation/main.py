@@ -1,4 +1,4 @@
-import geopandas as gpd
+import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -45,11 +45,26 @@ class similarity:
             raise ValueError("Columns must be given if column_weights is not given")
 
     # functions to prepare the data for the distance calculation
-    def _prepare_data(self, feature_space_file):
+    def _prepare_data(self, feature_space_file, feature_space_ref_file = None):
         df = pd.read_csv(feature_space_file)
+        if feature_space_ref_file is not None:
+            df_ref = pd.read_csv(feature_space_ref_file)
+            ref_ids = df_ref['id']
+            df = pd.concat([df, df_ref])
         if self.columns is None:
             self._set_columns(df.columns)
 
+        # removing the columns from self.columns if they are not in the df
+        na_cols = []
+        for column in self.columns:
+            if column not in df:
+                print(f'WARNING: column {column} was in column(_weights) but is not in df, removing it')
+                na_cols.append(column)
+        for column in na_cols:
+            self.columns.remove(column)
+            if self.column_weights is not None:
+                del self.column_weights[column]
+        
         normalized_df = self._normalize(df)
 
         # weighted columns only if needed (if column_weights is given)
@@ -57,7 +72,13 @@ class similarity:
             prepared_df = self._weighted_columns(normalized_df)
         else:
             prepared_df = normalized_df
-        return prepared_df
+        
+        if feature_space_ref_file is not None:
+            prepared_df_ref = prepared_df[prepared_df['id'].isin(ref_ids)]
+            prepared_df = prepared_df[~prepared_df['id'].isin(ref_ids)]
+            return prepared_df, prepared_df_ref
+        else:
+            return prepared_df
 
     def _normalize(self, df):
         """normalize the columns in the geopandas dataframe so that every feature has the same weight in the distance calculation"""
@@ -113,6 +134,9 @@ class similarity:
             print("Matrix is square")
             matrix = self._mirror(matrix)
         
+        parent_dir = os.path.dirname(path)
+        if os.path.isdir(parent_dir) == False:
+            os.mkdir(parent_dir)
         np.savetxt(path, matrix, delimiter=",", fmt=fmt, header=header, comments='')
         return matrix
 
@@ -174,13 +198,10 @@ class similarity:
         are from the original geopandas dataframe, the x-axis objects are from the
         reference geopandas dataframe."""
         # TODO: split this & the regular distance matrix function into smaller functions, which can be reused
-        
         self._check_csv(dist_matrix_path)
 
         if hasattr(self, 'prepared_df') == False:
-            self.prepared_df = self._prepare_data(self.feature_space_file)
-        self.prepared_df_ref = self._prepare_data(reference_feature_space)
-
+            self.prepared_df, self.prepared_df_ref = self._prepare_data(self.feature_space_file, reference_feature_space)
         # create an empty matrix and get all ids
         matrix = np.array([])
         reference_ids = self.prepared_df_ref["id"].values
