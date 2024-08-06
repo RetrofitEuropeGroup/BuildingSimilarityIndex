@@ -137,6 +137,8 @@ def eligible(cm, id, report):
 
     # check if there are any errors with the building in the val3dity report
     errors = get_errors_from_report(report, id, cm)
+    if cm['CityObjects'][parent_id]['attributes']['aantal_verblijfsobjecten'] is None:
+        return False
     if errors:
         return False
     else:
@@ -207,11 +209,13 @@ def add_purpose_of_use(values, actual_use, id, verbose=False):
     for use in possible_uses:
         if use in actual_use:
             uses_found += 1
-            values[use] = True
+            values[use] = 1
         else:
-            values[use] = False
-
-    if uses_found != len(actual_use) and actual_use != [None] and len(actual_use) != 0:
+            values[use] = 0
+    
+    if None in actual_use:
+        print(f'WARNING: found {actual_use} as actual_use for building {id}')
+    if len(actual_use) > 0 and uses_found != len(actual_use) and actual_use[0] != [None]:
         print(f'WARNING: Found {uses_found} uses, but expected {len(actual_use)}. actual_use: {actual_use}')
     return values    
 
