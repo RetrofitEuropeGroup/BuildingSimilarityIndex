@@ -13,7 +13,8 @@ async def fetch(session, task, headers, payload, params={}):  # fetching urls an
             retry_after = response.headers.get('retry-after')
             if retry_after is None:
                 retry_after = 10
-                print(f"Received 429, but no retry-after header for url {task['url']}. Waiting {retry_after} seconds")
+                msg = await response.text()
+                print(f"Received 429, but no retry-after header. Waiting {retry_after} seconds. Message: {msg}")
             else:
                 retry_after = int(retry_after)
                 print(f"Received 429, waiting {retry_after} seconds for url {task['url']}")
@@ -21,7 +22,7 @@ async def fetch(session, task, headers, payload, params={}):  # fetching urls an
             await fetch(session, task, headers, payload) # try again with a recursive call
         else:
             error_msg = await response.text()
-            print(f"Error {response.status} while fetching url {task['url']}. Text: {error_msg}")
+            print(f"Error {response.status} while fetching url {task['url']} with params {params}. Text: {error_msg}")
             task['status'] = 'error'
             task['error message'] = error_msg
 
@@ -29,9 +30,9 @@ def extract_results(url_tasks):
     all_results = []
     for task in url_tasks:
         result = task.get('result')
-        if result is not None:
-            all_results.append(result)
-        elif task['status'] != 'error':
+        all_results.append(result)
+        
+        if result is None and task['status'] != 'error':
             print(f"ERROR: while extracting results from {task}, result is None but status is not error")
     return all_results
 
@@ -50,7 +51,7 @@ def update_bar(t, previous_progress, url_tasks):
     previous_progress = current_progress
     return previous_progress
 
-async def request_url_list(all_urls, headers={}, payload={}, params=[], requests_persecond=50, max_active_tasks=500):
+async def request_url_list(all_urls, headers={}, payload={}, params=[], requests_persecond=50, max_active_tasks=500): #TODO: remove max_active_tasks
     try:
         async with aiohttp.ClientSession() as session:
             # convert to list of dicts
@@ -72,18 +73,19 @@ async def request_url_list(all_urls, headers={}, payload={}, params=[], requests
                     current_second = datetime.now().second
                     started_tasks_this_second = 0
 
-                if started_tasks_this_second > requests_persecond:
-                    # wait until the next second so we can start new tasks
-                    time_to_next_second = 1 - (datetime.now().microsecond / 1000000)
-                    await asyncio.sleep(time_to_next_second)
 
                 # starting the task
                 url_tasks[index]['status'] = 'fetch'
                 started_tasks_this_second += 1
-                if params:
+                if len(params) > 0:
                     asyncio.create_task(fetch(session, task, headers, payload, params[index]))
                 else:
                     asyncio.create_task(fetch(session, task, headers, payload))
+
+                if started_tasks_this_second >= requests_persecond:
+                    # wait until the next second so we can start new tasks
+                    time_to_next_second = 1 - (datetime.now().microsecond / 1000000)
+                    await asyncio.sleep(time_to_next_second)
 
             # loop until all tasks are done or error
             while tasks_to_wait(url_tasks) != 0:

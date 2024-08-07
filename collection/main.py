@@ -6,7 +6,7 @@ import requests
 import dotenv
 from tqdm import tqdm
 
-dotenv.load_dotenv()
+dotenv.load_dotenv() # load the api key for the bag for the .env file
 
 parent_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_dir)
@@ -82,46 +82,11 @@ class collection():
         attributes = {'totaal_oppervlakte': total_oppervlakte, 'aantal_verblijfsobjecten': len(adressen), 'gebruiksdoelen': gebruiksdoelen} 
         return attributes
 
-    # async def _request_bag_data(self, session, id, params, headers):
-    #     url = 'https://api.bag.kadaster.nl/lvbag/individuelebevragingen/v2/adressenuitgebreid'
-    #     async with session.get(url, params=params, headers=headers) as resp:
-    #         try:
-    #             result = await resp.json()
-    #         except Exception as e:
-    #             print(f"Error for {id}, response: {await resp.text()}")
-    #             result = {}
-    #         asyncio.sleep(1) #TODO: find a proper way to limit the request to 50 a second
-    #         if 'bag_id' in result:
-    #             raise Exception("ERROR: already found an id in the result")
-    #         result['bag_id'] = id
-    #         return result
-
-    # async def _async_get_bag_attributes(self, request_ids: list):
-    #     # construct the header & parameters        
-    #     import aiohttp
-    #     connector = aiohttp.TCPConnector(limit=24)
-
-    #     key = os.environ.get('BAG_API_KEY')
-    #     headers = {'X-Api-Key':key, 'Accept-Crs': 'EPSG:28992'}
-
-    #     async with aiohttp.ClientSession(connector=connector) as session:
-    #         tasks = []
-    #         for id in request_ids:
-    #             params = {'pandIdentificatie':id}
-    #             tasks.append(asyncio.ensure_future(self._request_bag_data(session, id, params, headers)))
-        
-    #         task_results = await asyncio.gather(*tasks)
-    #         extracted_bag_data = {}
-    #         for result in task_results:
-    #            attributes = self._process_bag_result(result)
-    #            extracted_bag_data[result['bag_id']] = attributes
-    #     return extracted_bag_data
-
     def _get_bag_attributes(self, request_ids: list):
         #TODO: make it optional to use the bag
         
         url = 'https://api.bag.kadaster.nl/lvbag/individuelebevragingen/v2/adressenuitgebreid'
-        key = os.environ.get('BAG_API_KEY')
+        key = os.environ.get('BAG_API_KEY') #TODO: make sure this is an option
         headers = {'X-Api-Key':key, 'Accept-Crs': 'EPSG:28992'}
         
 
