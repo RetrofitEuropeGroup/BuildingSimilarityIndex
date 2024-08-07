@@ -60,6 +60,10 @@ class similarity:
             if column not in df:
                 print(f'WARNING: column {column} was in column(_weights) but is not in df, removing it')
                 na_cols.append(column)
+            if max(df[column]) == min(df[column]):
+                print(f'WARNING: column {column} has only one value, removing it')
+                na_cols.append(column)
+
         for column in na_cols:
             self.columns.remove(column)
             if self.column_weights is not None:
