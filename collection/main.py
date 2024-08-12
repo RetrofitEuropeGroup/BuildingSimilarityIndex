@@ -87,6 +87,8 @@ class collection():
         
         url = 'https://api.bag.kadaster.nl/lvbag/individuelebevragingen/v2/adressenuitgebreid'
         key = os.environ.get('BAG_API_KEY') #TODO: make sure this is an option
+        if key is None:
+            print("WARNING: the BAG_API_KEY is None. Make sure you include BAG_API_KEY in the .env file in the root folder")
         headers = {'X-Api-Key':key, 'Accept-Crs': 'EPSG:28992'}
         
 
