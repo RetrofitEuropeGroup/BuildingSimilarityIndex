@@ -44,6 +44,7 @@ class processing():
     # main functions
     def _merge_files(self):
         """ Merges the files in the input folder to a single file"""
+        # TODO: make sure only the files that are in all_ids are merged 
         merge_folder = Path(self._bag_data_folder + '_merged') # create a new folder, if needed, for the merged files
         merger = MergeCityJSON(self._bag_data_folder, output_folder=merge_folder)
         merger.run()
@@ -68,7 +69,7 @@ class processing():
         for col in feature_space_merged.columns:
             if feature_space_merged[col].dtype == bool:
                 feature_space_merged[col] = feature_space_merged[col].astype(int)
-                print('Converted column', col, 'to int')
+                print('Converted column', col, 'to int') #TODO: remove after full pipeline run
         return feature_space_merged
 
     def run(self):
