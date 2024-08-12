@@ -294,6 +294,14 @@ def process_building(building,
     # Get the dimensions of the 2D oriented bounding box
     S, L = si.get_box_dimensions(obb_2d)
 
+    # TODO: check if we can add errors from b3_val3dity_lod22
+    b3_opp_grond = building['attributes'].get("b3_opp_grond")
+    if b3_opp_grond is not None:
+        b3_hellingshoek_proxy = building['attributes'].get("b3_opp_dak_plat", 0) + building['attributes'].get("b3_opp_dak_schuin", 0) / b3_opp_grond
+    else:
+        print(f'WARNING: b3_opp_grond not found for building {obj}')
+        b3_hellingshoek_proxy = None
+
     values = {
         "actual_volume": fixed.volume,
         "convex_hull_volume": ch_volume,
@@ -303,6 +311,8 @@ def process_building(building,
         "b3_opp_dak_schuin": building['attributes']['b3_opp_dak_schuin'],
         "b3_opp_grond": building['attributes']['b3_opp_grond'],
         "b3_opp_scheidingsmuur": building['attributes']['b3_opp_scheidingsmuur'],
+        "b3_bouwlagen": building['attributes']['b3_bouwlagen'],
+        "b3_hellingshoek_proxy": b3_hellingshoek_proxy,
         "aantal_verblijfsobjecten": building['attributes'].get("aantal_verblijfsobjecten", []),
         "totaal_oppervlakte": building['attributes'].get("totaal_oppervlakte"),
         "main_roof_parts": building['attributes'].get("main_roof_parts"),
@@ -392,7 +402,6 @@ def calculate_metrics(input,
     vertices = np.array(verts)
 
     # Count the number of jobs
-    #TODO: we could speed up by creating a second cm, but with only eligible buildings
     total_jobs = 0
     for obj in cm["CityObjects"]:
         if eligible(cm, obj, report):
