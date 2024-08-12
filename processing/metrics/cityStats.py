@@ -1,21 +1,23 @@
 import json
 import os
+import sys
 import math
-import subprocess
 
-import click
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import geopandas
 import pyvista as pv
-import rtree.index
 import scipy.spatial as ss
+
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-import cityjson
-import geometry
+# add the path of the own directory to the system path so that our own modules can be imported
+file_dir = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(file_dir)
+
+import cityjson as cityjson
+import geometry as geometry
 import shape_index as si
 
 def compute_stats(values, percentile = 90, percentage = 75):
@@ -48,14 +50,16 @@ def convexhull_volume(points):
         return 0
 
 def get_errors_from_report(report, objid, cm):
-    """Return the report for the feature of the given obj"""
-    if not "features" in report:
-        return []
+    """Return false / true if it finds error in the val3dity report"""
+    if report == {}:
+        return False
+    elif not "features" in report:
+        return False
 
     obj = cm["CityObjects"][objid]
 
     if not "geometry" in obj or len(obj["geometry"]) == 0:
-        return []
+        return False
 
     if "parents" in obj:
         parid = obj["parents"][0]
@@ -67,41 +71,23 @@ def get_errors_from_report(report, objid, cm):
             if f['validity'] == False:
                 return True
             else:
-                return []
+                return False
+    return False
 
-    return []
-
-def save_filter_stats(outfiltered_2d, outfiltered_3d, output):
-    # split the output path to get the output folder
-    output_folder_parts = os.path.split(output)[:-1]
-    logger_path = os.path.join(*output_folder_parts, "filtered_buildings.csv")
-
-    output_name = os.path.split(output)[-1]
-
-    # update the logger
-    new_line = f'{output_name};{round(outfiltered_2d, 4)};{round(outfiltered_3d, 4)}\n'
-    if os.path.exists(logger_path) == False:
-        with open(logger_path, 'w') as f:
-            f.write('output_filename;filtered_2d;filtered_3d\n')
-    with open(logger_path, 'a') as f:
-        f.write(new_line)
-
-
-def clean_df(df, output):
-    """Cleans the dataframe, it removes the buildings with errors, 
-    holes, and buildings with index values out of the normal range."""
+def check_suitability(df):
     ## filter based on some conditions
     # filter out the buldings with actual_volume lower than 40, no holes
     # and actual volume larger than convex hull volume
-    clean = df[df['actual_volume'] < df['convex_hull_volume']]
-    clean = clean[clean['actual_volume'] >= 40]
-    clean = clean[clean['hole_count'] == 0]
+    clean = df[(df['actual_volume'] < df['convex_hull_volume']) & (df['actual_volume'] >= 40) & (df['hole_count'] == 0)]
+    perc_convex = len(df.query('actual_volume > convex_hull_volume')) / len(df)
+    perc_vol40 = len(df.query('actual_volume < 40')) / len(df)
+    perc_holes = len(df.query('hole_count > 0')) / len(df)
+    return clean, perc_convex, perc_vol40, perc_holes
 
-    ## filter out the buildings with index values out of the range
+def check_metric_values(clean, df):
+    """filters out the buildings with index values out of the range (0-1.2)"""
     # start with determining which indices are 2d and 3d
-
     indices_2d = [col for col in df.columns if col.endswith("_2d")] + ["horizontal_elongation"]
-
     indices_3d = ([col for col in df.columns if col.endswith("_3d")] +
                 ["horizontal_elongation"])
 
@@ -109,43 +95,54 @@ def clean_df(df, output):
     min_value = 0
     max_value = 1.2
 
-    before2d = len(clean)
+    before = len(clean)
     for ind in indices_2d:
         clean = clean[(clean[ind] >= min_value) & (clean[ind] <= max_value)]
-    after2d = len(clean)
-    before3d = len(clean)
     for ind in indices_3d:
         clean = clean[(clean[ind] >= min_value) & (clean[ind] <= max_value)]
-    outfiltered_2d = (before2d - after2d) / before2d
-    outfiltered_3d = (before3d - len(clean)) / before3d
+    outfiltered_metrics = (before - len(clean)) / len(df)
+    return clean, outfiltered_metrics   
 
-    save_filter_stats(outfiltered_2d, outfiltered_3d, output)
-    # filter out the irrelevant columns
+def clean_df(df, verbose=True):
+    """Cleans the dataframe, it removes the buildings with errors,
+    holes, and buildings with index values out of the normal range."""
+    # check the suitability of the buildings based on 3 conditions
+    clean, perc_convex, perc_vol40, perc_holes = check_suitability(df)
+    clean = clean.drop(columns=["hole_count", 'min_vertical_elongation', 'max_vertical_elongation'], axis=1)
+    
+    clean, outfiltered_metrics = check_metric_values(clean, df)
 
-    irrelevant_columns = ["type", "lod", "errors", "valid", "orientation_values", "orientation_edges",
-                          "hole_count", 'min_vertical_elongation', 'max_vertical_elongation']
-    for col in irrelevant_columns:
-        if col in clean.columns:
-            clean = clean.drop(columns=col)
-
+    # let the user know how many buildings have been filtered out
+    rows_lost_perc = 1 - len(clean) / len(df)
+    if verbose and rows_lost_perc == 0:
+        print("INFO: All buildings are suitable for processing. None have been filtered out.")
+    elif verbose:
+        print(f"""INFO: {rows_lost_perc:.2%} of the buildings has been filtered out as it did not meet one of the requirements, note that buildings can be filtered out for multiple reasons and thus may count multiple times:
+        {perc_convex:.2%} \t has a actual_volume that is larger than convex_hull_volume
+        {perc_vol40:.2%} \t has an actual_volume smaller than 40
+        {perc_holes:.2%} \t has a hole_count that is not zero
+        {outfiltered_metrics:.2%} \t has metrics values out of the normal range""")
     return clean
 
 def eligible(cm, id, report):
-    """Returns True if the building is eligible for processing"""
-    if report == {}:
-        return True
-    
-    errors = get_errors_from_report(report, id, cm)
-    if errors:
-        return False
-
+    """Returns True if the building is eligible for processing, otherwise returns False"""    
+    # we only process buildingparts as they are 3D
     if cm["CityObjects"][id]['type'] != 'BuildingPart':
         return False
-
+    
+    # we cannot process multiple children as some children are really small
     parent_id = cm["CityObjects"][id]['parents'][0]
     if len(cm['CityObjects'][parent_id]['children']) > 1:
         return False
-    return True
+
+    # check if there are any errors with the building in the val3dity report
+    errors = get_errors_from_report(report, id, cm)
+    if cm['CityObjects'][parent_id]['attributes']['aantal_verblijfsobjecten'] is None:
+        return False
+    if errors:
+        return False
+    else:
+        return True
 
 def get_parent_attributes(cm, obj):
     """Returns the attributes of the parent of the given object. The parent should be in the same city model."""
@@ -159,23 +156,26 @@ def get_parent_attributes(cm, obj):
 
 def get_report(input):
     # create the val3dity report with the same name as the input file
-    val3dity_report = f"{input.name[:-5]}_report.json"
-    # determine the location of the val3dity command
-    # TODO: this can just be 1 line right? No need to check if it's in processing or not
-    if 'processing' in os.getcwd():
-        val3dity_cmd_location = os.path.join(os.getcwd(), 'metrics/val3dity/val3dity')
-    else:
-        val3dity_cmd_location = os.path.join(os.getcwd(), 'processing/metrics/val3dity/val3dity')
+    val3dity_report = f"{input[:-5]}_report.json"
 
     if os.path.exists(val3dity_report):
-        report = open(val3dity_report, "rb")
+        with open(val3dity_report, "rb") as f:
+            report = json.load(f)
     else:
         try:
-            subprocess.check_output(f'{val3dity_cmd_location} {input.name} -r {val3dity_report}')
-            report = open(val3dity_report, "rb")
+            # determine the location of the val3dity executable
+            file_dir = os.path.dirname(os.path.realpath(__file__))
+            val3dity_cmd_location = os.path.join(file_dir, 'val3dity/val3dity')
+
+            # TODO: make this subprocess again so that the output is not printed
+            command = f'""{val3dity_cmd_location}" "{input}" -r "{val3dity_report}""'
+            os.system(command)
+            # subprocess.check_output(f'{val3dity_cmd_location} {input.name} -r {val3dity_report}')
+            with open(val3dity_report, "rb") as f:
+                report = json.load(f)
         except Exception as e:
             report = {}
-            print(f"Warning: Could not run val3dity, continuing without report")        
+            print(f"Warning: Could not run val3dity, continuing without report. Message: {e}")
     return report
 
 class StatValuesBuilder:
@@ -197,6 +197,28 @@ class StatValuesBuilder:
         else:
             self.__values[index_name] = "NC"
 
+def add_purpose_of_use(values, actual_use, id, verbose=False):
+    if len(actual_use) == 0 and verbose:
+        print(f'WARNING: No actual_use (gebruiksdoelen) found for building {id}')
+
+    possible_uses = ['woonfunctie', 'bijeenkomstfunctie', 'celfunctie', 'gezondheidszorgfunctie', 'industriefunctie', 
+    'kantoorfunctie', 'logiesfunctie', 'onderwijsfunctie', 'sportfunctie', 'winkelfunctie',
+    'overige gebruiksfunctie']
+    uses_found = 0
+    # add the possible uses to the dict to make it a seperate column
+    for use in possible_uses:
+        if use in actual_use:
+            uses_found += 1
+            values[use] = 1
+        else:
+            values[use] = 0
+    
+    if None in actual_use:
+        print(f'WARNING: found {actual_use} as actual_use for building {id}')
+    if len(actual_use) > 0 and uses_found != len(actual_use) and actual_use[0] != [None]:
+        print(f'WARNING: Found {uses_found} uses, but expected {len(actual_use)}. actual_use: {actual_use}')
+    return values    
+
 def process_building(building,
                      obj,
                      filter,
@@ -205,7 +227,8 @@ def process_building(building,
                      density_2d,
                      density_3d,
                      vertices,
-                     custom_indices=None):
+                     custom_indices=None,
+                     verbose=False):
 
     if not filter is None and filter != obj:
         return obj, None
@@ -280,11 +303,14 @@ def process_building(building,
         "b3_opp_dak_schuin": building['attributes']['b3_opp_dak_schuin'],
         "b3_opp_grond": building['attributes']['b3_opp_grond'],
         "b3_opp_scheidingsmuur": building['attributes']['b3_opp_scheidingsmuur'],
+        "aantal_verblijfsobjecten": building['attributes'].get("aantal_verblijfsobjecten", []),
+        "totaal_oppervlakte": building['attributes'].get("totaal_oppervlakte"),
         "hole_count": tri_mesh.n_open_edges,
         "geometry": shape,
     }
+    purposes = building['attributes'].get("gebruiksdoelen", [])
+    values = add_purpose_of_use(values, np.unique(purposes), obj, verbose)
 
-    
     voxel = pv.voxelize(tri_mesh, density=density_3d, check_surface=False)
     grid = voxel.cell_centers().points
 
@@ -327,35 +353,26 @@ def process_building(building,
 
 
 # Assume semantic surfaces
-@click.command()
-@click.argument("input", type=click.File("rb"))
-@click.option('-o', '--output')
-@click.option('-f', '--filter')
-@click.option('-r', '--repair', flag_value=True)
-@click.option('-p', '--plot-buildings', flag_value=True)
-@click.option('--without-indices', flag_value=True)
-@click.option('-j', '--jobs', default=1)
-@click.option('--density-2d', default=1.0)
-@click.option('--density-3d', default=1.0)
-def main(input,
-         output,
-         filter,
-         repair,
-         plot_buildings,
-         without_indices,
-         jobs,
-         density_2d,
-         density_3d):
+def calculate_metrics(input,
+         output_path=None,
+         filter=None,
+         repair=False,
+         plot_buildings=False,
+         without_indices=False,
+         jobs=1,
+         density_2d=1.0,
+         density_3d=1.0,
+         verbose=False):
+    """Uses a cityjson file to calculate the 2d / 3d metrics for the buildings in the cityjson file"""
 
-    cm = json.load(input)
+    with open(input, "r") as f:
+        cm = json.load(f)
 
-    # if no output file is provided, use the name of the input file. But in the output folder
-    if output is None:
-        output = input.name[:-5] + ".csv"
-        output = output.replace('input', 'output')
-
-    # create and open the report
-    report = get_report(input)
+        # create and open the report
+        report = get_report(input)
+        
+        if os.path.exists('val3dity.log'): # clean the mess
+            os.remove('val3dity.log')
 
     if "transform" in cm:
         s = cm["transform"]["scale"]
@@ -369,6 +386,7 @@ def main(input,
     vertices = np.array(verts)
 
     # Count the number of jobs
+    #TODO: we could speed up by creating a second cm, but with only eligible buildings
     total_jobs = 0
     for obj in cm["CityObjects"]:
         if eligible(cm, obj, report):
@@ -376,7 +394,7 @@ def main(input,
 
 
     num_cores = jobs
-    print(f'Using {num_cores} cores to process {total_jobs} buildings')
+    print(f'Using {num_cores} core(s) to process {total_jobs} building(s)')
     with ProcessPoolExecutor(max_workers=num_cores) as pool:
         # add the jobs to the pool
         futures = []
@@ -399,11 +417,12 @@ def main(input,
                                 density_2d,
                                 density_3d,
                                 vertices,
-                                indices_list)
+                                indices_list,
+                                verbose)
             futures.append(future)
 
         # wait for the jobs to finish and add the results to the stats
-        with tqdm(total=total_jobs) as progress:
+        with tqdm(total=total_jobs, desc="Calculating the 2D & 3D metrics") as progress:
             stats = {}
             for future in as_completed(futures):
                 # retrieve the result
@@ -414,26 +433,24 @@ def main(input,
 
     df = pd.DataFrame.from_dict(stats, orient="index")
     df.index.name = "id"
-    try:
-        clean = clean_df(df, output)
-    except Exception as e:
-        print(f"ERROR: Problem with cleaning the dataframe: {e}")
-        clean = df
-    
-    try:
-        if output.endswith(".csv"):
-            clean.to_csv(output)
-        elif output.endswith('.gpkg'):
-            gdf = geopandas.GeoDataFrame(clean, geometry="geometry")
-            gdf.to_file(f"{output}", driver="GPKG")
-        else:
-            clean.to_excel(output)
-    except Exception as e:
-        print(f"ERROR: could not save the file: {e}")
-        clean.to_csv("emergency.csv")
 
-    if os.path.exists('val3dity.log'): # clean the mess
-        os.remove('val3dity.log')
+    try:
+        clean = clean_df(df, verbose)
+    except Exception as e:
+        print(f"ERROR: Problem with cleaning the dataframe, using the original. Error message: {e}")
+        clean = df
+
+    try:
+        if output_path is not None and output_path.endswith(".csv"):
+            clean.to_csv(output_path)
+        elif output_path is not None and output_path.endswith('.gpkg'):
+            gdf = geopandas.GeoDataFrame(clean, geometry="geometry")
+            gdf.to_file(f"{output_path}", driver="GPKG")
+        elif output_path is not None:
+            raise ValueError("output_path should be a .csv or .gpkg file")
+    except Exception as e:
+        print(f"ERROR: could not save the file. Error message: {e}")
+    return clean
 
 if __name__ == "__main__":
-    main()
+    df = calculate_metrics("data/bag_data_merged/merged_1.city.json", output_path="./data/gpkg/test.csv", jobs=4)

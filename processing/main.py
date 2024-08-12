@@ -1,76 +1,87 @@
 import os
 import sys
 from pathlib import Path
+import pandas as pd
 
-# if we run the script from the processing folder, we need to add the parent folder to the path
-# otherwise it won't search for processing.merge_cityjson in the root folder of the repository
-# this is useful for testing
-parent_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-sys.path.append(parent_dir)
-from processing.merge_cityjson import MergeCityJSON
+# add the path of the own directory to the system path so that the modules can be imported
+file_dir = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(file_dir)
+
+from merge_cityjson import MergeCityJSON
+from metrics.cityStats import calculate_metrics
+from turning_functions.main import perform_turning_function
 
 class processing():
-    def __init__(self, gpkg_path: str, bag_data_folder: str = None, cityjson_path: str = None):
-        if bag_data_folder is None and cityjson_path is None:
-            raise ValueError("Either input_folder or cityjson_path should be provided")
-        elif bag_data_folder is not None and cityjson_path is not None:
-            raise ValueError("It is not possible to use both bag_data_folder and cityjson_path")
-        
-        self.bag_data_folder = bag_data_folder
-        self.cityjson_path = cityjson_path
-        self.validate_gpkg_path(gpkg_path)
-        
+    def __init__(self, feature_space_file: str, bag_data_folder: str = None, categorical_columns: list = None, verbose: bool = False):
+        """
+        Initializes an instance of the class that is used to process the data. Processing the data consists of 
+        two steps: merging the files in the input folder to a single file (1) and creating a feature space from the merged file.
+        The feature space is a pandas dataframe that contains the 2D and 3D metrics and the turning function features, other
+        variables could be added as well. It saves the feature space to a csv file in the feature_space_file and saves it to self.feature_space
 
-    def validate_gpkg_path(self, file_path: str):
-        if isinstance(file_path, str) == False:
-            raise ValueError("The gpkg_path (which is the output file) should be a string")
-        elif file_path.endswith('.gpkg') == False:
-            raise ValueError("""The gpkg_path (which is the output file) is the path to where the geopackage
-                              data frame will be saved. Extension should be .gpkg""")
+        Args:
+            feature_space_file (str): The path to the output file where the processed data (=feature space) will be saved.
+            bag_data_folder (str, optional): The path to the folder containing multiple cityjson files with a single building, source is from the BAG. Defaults to None.
+            categorical_columns (list, optional): A list of column names that are categorical, these columns will get distance 1/num_categories if they are not equal and 0 if they are. Defaults to None.
+            verbose (bool, optional): If True, the progress will be printed. Defaults to False.
+        """
+
+        self._bag_data_folder = bag_data_folder
+        self._categorical_columns = categorical_columns
+        self._set_feature_space_file(feature_space_file)
+        self._verbose = verbose
+
+    def _set_feature_space_file(self, file_path: str):
+        if file_path.endswith('.csv') == False:
+            raise ValueError("The feature_space_file can only be a .csv file")
         else:
-            self.gpkg_path = file_path
-        parent_dir = os.path.dirname(self.gpkg_path)
-        if not os.path.exists(parent_dir):
-            os.makedirs(parent_dir)
+            parent_dir = os.path.dirname(file_path)
+            if not os.path.exists(parent_dir) and parent_dir != '': # if the parent directory does not exist, create it
+                os.makedirs(parent_dir)
+
+            self.feature_space_file = file_path        
 
     # main functions
-    def merge_files(self):
+    def _merge_files(self):
         """ Merges the files in the input folder to a single file"""
-        merge_folder = Path(self.bag_data_folder.replace('bag_data', 'bag_data_merged')) # create a new folder, if needed, for the merged files
-        merger = MergeCityJSON(self.bag_data_folder, output_folder=merge_folder)
+        merge_folder = Path(self._bag_data_folder + '_merged') # create a new folder, if needed, for the merged files
+        merger = MergeCityJSON(self._bag_data_folder, output_folder=merge_folder)
         merger.run()
 
-        self.cityjson_path = merger.file_path
+        self._merged_file = merger.file_path
 
-    def initiate_gpkg(self):
-        """ Initiates the .gpkg path with the 2d and 3d metrics"""
-        # determine the number of processors to use and where the cityStats.py file is located
-        n_processors = os.cpu_count() - 2
-        if os.getcwd().endswith('processing'):
-            city_stats_location =  "metrics/cityStats.py"
-        else:
-            city_stats_location =  "processing/metrics/cityStats.py"
+    def _create_feature_space(self):
+        """ Create a pd dataframe with the feature space. First step in the process is to calculate the 2d / 3d metrics on the merged cityjson which outputs a geo df, this is then used to execute the turning function"""
+        # determine the number of processors to use and where the cityStats.py file is located, max function is used to prevent using all processors while at the same time ensuring that at least 1 processor is used
+        n_processors = max(os.cpu_count() - 1, 1)
 
-        # run the citystats script
-        command = f'python {city_stats_location} {self.cityjson_path} -j {n_processors} -o {self.gpkg_path}'
-        os.system(command)
+        # run the citystats script in which the metrics are calculated
+        feature_space_metrics = calculate_metrics(input=self._merged_file, jobs=n_processors, verbose=self._verbose)
+
+        # execute the turning function
+        feature_space_tf = perform_turning_function(feature_space_metrics)
+
+        # merge the results in one data frame & return the df
+        feature_space_merged = feature_space_metrics.merge(feature_space_tf, on='id')
+        feature_space_merged.drop(columns=['geometry'], inplace=True) # drop the geometry column as it is a shapely object and cannot be saved to a csv file
+
+        for col in feature_space_merged.columns:
+            if feature_space_merged[col].dtype == bool:
+                feature_space_merged[col] = feature_space_merged[col].astype(int)
+                print('Converted column', col, 'to int')
+        return feature_space_merged
 
     def run(self):
-        # merge if not a single file has been provided
-        if self.bag_data_folder is not None:
-            self.merge_files()
+        # merge if a folder has been provided
+        if len(os.listdir(self._bag_data_folder)) == 0:
+            raise Exception("The bag_data_folder is empty, please provide a folder with cityjson files")
+        if self._bag_data_folder is not None:
+            self._merge_files()
 
-        # calculate the 2d / 3d metrics and save them to a gpkg
-        self.initiate_gpkg()
+        # calculate the 2d / 3d metrics and turning function features
+        # TODO: create a single progress bar
+        self.feature_space = self._create_feature_space()
+        if self._categorical_columns is not None:
+            self.feature_space = pd.get_dummies(self.feature_space, columns=self._categorical_columns, dtype=int)
 
-        # TODO: add the results from the turning function, you can load the geometry from the gpkg.
-        # the filepath of the gpkg is stored in self.gpkg_path
-
-
-if __name__ == '__main__':
-    p = processing(gpkg_path="data/gpkg/test.gpkg", bag_data_folder="data/bag_data")
-    # p = processing(cityjson_path="analysis/voorbeeldwoningen.city.json", gpkg_path="collection/output/output.gpkg")
-    p.run()
-    import geopandas as gpd
-    gdf = gpd.read_file(p.gpkg_path)
-    print(gdf.columns)
+        self.feature_space.to_csv(self.feature_space_file)

@@ -1,4 +1,5 @@
 import shapely
+import numpy as np
 
 
 ## lengte zijde 1, lengte zijde 2
