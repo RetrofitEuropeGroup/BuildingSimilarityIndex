@@ -10,12 +10,14 @@ def roofmetrics(bagid=None, bbox=None, verbose=False):
     :param bbox: Bounding box of the building in the form of 'minx,miny,maxx,maxy'
     :return: dictionary with roof metrics
     """
-
+    if isinstance(bagid, str) and bagid.startswith("NL.IMBAG.Pand.") == False:
+        bagid = "NL.IMBAG.Pand." + bagid
     if not bagid or not bbox:
         bagid = 'NL.IMBAG.Pand.0321100000002220'
         bbox = "138467.57,449429.21,138521.21,449474.03"
         print('No BAG id or bounding box provided, using default values')
         verbose = True
+    
 
     r = requests.get("https://data.3dbag.nl/api/BAG3D/wfs", params=dict(
         service="WFS",
@@ -58,12 +60,15 @@ def roofmetrics(bagid=None, bbox=None, verbose=False):
         print(f'Area ratio: {area_ratio:.2f}')
 
     return dict(
-        main_roof_parts=mr_no_parts,
+        main_roof_parts=int(mr_no_parts), # convert to int for json serialisation
         main_roof_area=mr_area,
-        other_roof_parts=other_no_parts,
+        other_roof_parts=int(other_no_parts),
         other_roof_area=other_area,
         part_ratio=part_ratio,
         area_ratio=area_ratio
     )
 
-roofmetrics()
+if __name__ == "__main__":
+    bagid = 'NL.IMBAG.Pand.0003100000120810'
+    bbox = "253503.15375,592949.834,253703.15375,593149.834"
+    roofmetrics(bagid, bbox, verbose=True)
