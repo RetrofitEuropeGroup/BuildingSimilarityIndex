@@ -46,7 +46,7 @@ def roofmetrics(bagid=None, bbox=None, verbose=False):
     mr_no_parts = data['main_roof'].sum()
     mr_area = data[data['main_roof']]['geometry'].area.sum()
 
-    other_no_parts = data['main_roof'].sum()
+    other_no_parts = len(data) - mr_no_parts
     other_area = data[~data['main_roof']]['geometry'].area.sum()
 
     part_ratio = mr_no_parts / (mr_no_parts + other_no_parts)
