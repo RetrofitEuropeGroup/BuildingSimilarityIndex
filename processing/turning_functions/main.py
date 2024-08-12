@@ -273,7 +273,7 @@ def round_polygon(pol, decimals=1, simplify_tolerance=0.2):
 def perform_turning_function(df, 
                         reference_shapes_path=None,
                         geometry_column='geometry',
-                        metric='l1' # TODO: should this be l1 or l2? I get a lower distance with l1 which should be the opposite
+                        metric='l1'
                         ):
 
     ## One file provided:
