@@ -77,8 +77,7 @@ class collection():
         # get the adressen and their info
         adressen = result.get('_embedded', {}).get('adressen')
         if adressen is None:
-            print(f"Could not find adressen in the response json: {id}")
-            return {}
+            raise ValueError(f"Could not find adressen in the bag for building {id}")
         
         # loop over the adresses to get the relevant information
         total_oppervlakte = 0
@@ -89,16 +88,15 @@ class collection():
 
             oppervlakte = adres.get('oppervlakte')
             if oppervlakte is None:
-                print(f'Surface cannot be found for adres: {adres}')
+                raise ValueError(f'Surface cannot be found for building {id}')
             else:
                 total_oppervlakte += oppervlakte
         if gebruiksdoelen == []:
-            print(f"Could not identify the purpose of use for bag object: {id}")
+            raise ValueError(f"Could not identify the use purpose for building: {id}")
         attributes = {'totaal_oppervlakte': total_oppervlakte, 'aantal_verblijfsobjecten': len(adressen), 'gebruiksdoelen': gebruiksdoelen} 
         return attributes
 
     async def _get_additional_bag_attributes(self, id: str, session):
-        #TODO: make it optional to use the bag
         await asyncio.sleep(min(random.normalvariate(0.5), 0.1)) # to avoid the rate limit, the 3d_bag call takes way longer anyway
         
         headers = {'X-Api-Key':self.key, 'Accept-Crs': 'EPSG:28992'}
@@ -156,8 +154,11 @@ class collection():
                     roof_attributes = await self._get_roof_attributes(id, bag3d_data, session)
                 cityjson = self._convert_to_cityjson(bag3d_data, bag_attributes, roof_attributes, id)
                 self._save(cityjson, id) # use request_ids to get the right id without the pre- and suffix
-            except aiohttp.ClientError as e:
-                print(f"Request for {id} failed: {e}")
+            except KeyboardInterrupt:
+                raise KeyboardInterrupt
+            except Exception as e:
+                if self._verbose:
+                    print(f"  Request for {id} failed: {e}")
                 self.errors += 1
             self.bar.update(1)
 
