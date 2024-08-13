@@ -1,9 +1,7 @@
 import geopandas as gpd
-import requests
 import geojson
 
-
-def roofmetrics(bagid=None, bbox=None, verbose=False):
+async def roofmetrics(bagid=None, bbox=None, verbose=False, session=None):
     """
     Function to get roof metrics from 3dbag API
     :param bagid: BAG id of the building
@@ -18,18 +16,24 @@ def roofmetrics(bagid=None, bbox=None, verbose=False):
         print('No BAG id or bounding box provided, using default values')
         verbose = True
     
+    params=dict(
+            service="WFS",
+            version="2.0.0",
+            request="GetFeature",
+            typeName="BAG3D:lod22",
+            outputFormat="json",
+            BBOX=bbox,
+        )
+    
+    url = "https://data.3dbag.nl/api/BAG3D/wfs"
 
-    r = requests.get("https://data.3dbag.nl/api/BAG3D/wfs", params=dict(
-        service="WFS",
-        version="2.0.0",
-        request="GetFeature",
-        typeName="BAG3D:lod22",
-        outputFormat="json",
-        BBOX=bbox,
-    ))
+    r = await session.get(url, params=params)
+    r.raise_for_status()
+    r = await r.text()
+    
 
     # Create GeoDataFrame from geojson and set coordinate reference system
-    data = gpd.GeoDataFrame.from_features(geojson.loads(r.content), crs="EPSG:7415")
+    data = gpd.GeoDataFrame.from_features(geojson.loads(r), crs="EPSG:7415")
     data = data[data['identificatie'] == bagid]
 
     # calculate max height of the roofparts
@@ -39,7 +43,7 @@ def roofmetrics(bagid=None, bbox=None, verbose=False):
     # for all currently false roofparts, make true if geometry has area larger than 50m2
     data['main_roof'] = data['main_roof'] | (data['geometry'].area > 50)
 
-    # TODO: horizontal roof angle not available in 3dbag data, so we cannot use 3d roof area yet.
+    # TODO: horizontal roof angle not available in 3dbag data, so we cannot use 3d roof area yet. Using a proxy based on b3_opp_grond, b3_opp_dak_schuin and b3_opp_dak_plat
     # data['3d_area'] = data['geometry'].area / math.cos(data['b3_hellingshoek'])
 
     # calculate metrics:
@@ -67,8 +71,3 @@ def roofmetrics(bagid=None, bbox=None, verbose=False):
         part_ratio=part_ratio,
         area_ratio=area_ratio
     )
-
-if __name__ == "__main__":
-    bagid = 'NL.IMBAG.Pand.0003100000120810'
-    bbox = "253503.15375,592949.834,253703.15375,593149.834"
-    roofmetrics(bagid, bbox, verbose=True)

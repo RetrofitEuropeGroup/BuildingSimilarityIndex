@@ -2,15 +2,16 @@ import sys
 import json
 import os
 import asyncio
-import requests
 import dotenv
 from tqdm import tqdm
+import aiohttp
+import random
 
 dotenv.load_dotenv() # load the api key for the bag for the .env file
 
 parent_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent_dir)
-from collection.async_requests import request_url_list
+# from collection.async_requests import request_url_list
 from collection.WFS_roof import roofmetrics
 
 class collection():
@@ -22,6 +23,13 @@ class collection():
     def __init__(self, bag_data_folder: str, verbose: bool = False):
         self._bag_data_folder = bag_data_folder
         self._verbose = verbose # TODO: integrate this in the request function
+        self.key = self._get_key()
+
+    def _get_key(self):
+        key = os.environ.get('BAG_API_KEY') #TODO: make sure this is an option
+        if key is None:
+            raise ValueError("WARNING: the BAG_API_KEY is None. Make sure you include BAG_API_KEY in the .env file in the root folder")
+        return key
 
     def _convert_to_cityjson(self, data: dict, bag_attributes: dict, roof_attributes: dict, id: str):
         """Converts the data (that is collected with the API request) to CityJSON format."""
@@ -31,15 +39,15 @@ class collection():
         cityjson['vertices'] = cityjsonfeature['vertices']
 
         bag_id = f"NL.IMBAG.Pand.{id}"
-        cityjson['CityObjects'][bag_id]['attributes']['totaal_oppervlakte'] = bag_attributes[id].get("totaal_oppervlakte")
-        cityjson['CityObjects'][bag_id]['attributes']['aantal_verblijfsobjecten'] = bag_attributes[id].get("aantal_verblijfsobjecten")
-        cityjson['CityObjects'][bag_id]['attributes']['gebruiksdoelen'] = bag_attributes[id].get("gebruiksdoelen")
-        cityjson['CityObjects'][bag_id]['attributes']['main_roof_parts'] = roof_attributes[id].get("main_roof_parts")
-        cityjson['CityObjects'][bag_id]['attributes']['main_roof_area'] = roof_attributes[id].get("main_roof_area")
-        cityjson['CityObjects'][bag_id]['attributes']['other_roof_parts'] = roof_attributes[id].get("other_roof_parts")
-        cityjson['CityObjects'][bag_id]['attributes']['other_roof_area'] = roof_attributes[id].get("other_roof_area")
-        cityjson['CityObjects'][bag_id]['attributes']['part_ratio'] = roof_attributes[id].get("part_ratio")
-        cityjson['CityObjects'][bag_id]['attributes']['area_ratio'] = roof_attributes[id].get("area_ratio")
+        cityjson['CityObjects'][bag_id]['attributes']['totaal_oppervlakte'] = bag_attributes.get("totaal_oppervlakte")
+        cityjson['CityObjects'][bag_id]['attributes']['aantal_verblijfsobjecten'] = bag_attributes.get("aantal_verblijfsobjecten")
+        cityjson['CityObjects'][bag_id]['attributes']['gebruiksdoelen'] = bag_attributes.get("gebruiksdoelen")
+        cityjson['CityObjects'][bag_id]['attributes']['main_roof_parts'] = roof_attributes.get("main_roof_parts")
+        cityjson['CityObjects'][bag_id]['attributes']['main_roof_area'] = roof_attributes.get("main_roof_area")
+        cityjson['CityObjects'][bag_id]['attributes']['other_roof_parts'] = roof_attributes.get("other_roof_parts")
+        cityjson['CityObjects'][bag_id]['attributes']['other_roof_area'] = roof_attributes.get("other_roof_area")
+        cityjson['CityObjects'][bag_id]['attributes']['part_ratio'] = roof_attributes.get("part_ratio")
+        cityjson['CityObjects'][bag_id]['attributes']['area_ratio'] = roof_attributes.get("area_ratio")
         return cityjson
 
     def _make_url(self, id: str):
@@ -89,26 +97,25 @@ class collection():
         attributes = {'totaal_oppervlakte': total_oppervlakte, 'aantal_verblijfsobjecten': len(adressen), 'gebruiksdoelen': gebruiksdoelen} 
         return attributes
 
-    def _get_bag_attributes(self, request_ids: list):
+    async def _get_additional_bag_attributes(self, id: str, session):
         #TODO: make it optional to use the bag
-        url = 'https://api.bag.kadaster.nl/lvbag/individuelebevragingen/v2/adressenuitgebreid'
-        key = os.environ.get('BAG_API_KEY') #TODO: make sure this is an option
-        if key is None:
-            raise ValueError("WARNING: the BAG_API_KEY is None. Make sure you include BAG_API_KEY in the .env file in the root folder")
-        headers = {'X-Api-Key':key, 'Accept-Crs': 'EPSG:28992'}
+        await asyncio.sleep(min(random.normalvariate(0.5), 0.1)) # to avoid the rate limit, the 3d_bag call takes way longer anyway
         
+        headers = {'X-Api-Key':self.key, 'Accept-Crs': 'EPSG:28992'}
+        url = 'https://api.bag.kadaster.nl/lvbag/individuelebevragingen/v2/adressenuitgebreid'
 
-        all_attributes = {}
-        for id in tqdm(request_ids, desc='Getting the BAG data'):
-            try:
-                params = {'pandIdentificatie':id}
-                r = requests.get(url, params=params, headers=headers).json()
-                attributes = self._process_bag_result(r, id)
-                all_attributes[id] = attributes
-            except Exception as e:
-                print(f"Error while getting the information for id {id} from {url}. \n Error message: {e}")
-                all_attributes[id] = {}
-        return all_attributes
+        params = {'pandIdentificatie':id}
+        r = await session.get(url, params=params, headers=headers)
+        r.raise_for_status()
+        bag_result = await r.json()
+        return self._process_bag_result(bag_result, id)
+
+    async def _get_3d_bag(self, id: str, session):
+        url = self._make_url(id)
+        r = await session.get(url)
+        r.raise_for_status()
+        r = await r.json()
+        return r
 
     def _get_bbox(self, id: str, data: dict):
         """Get the bounding box of a building from the 3D-BAG API."""
@@ -117,15 +124,11 @@ class collection():
             return None #TODO: remove after a while
         translate = data['metadata']['transform']['translate']
         centroid_x, centroid_y = translate[0], translate[1]
-        #TODO: check if a smaller bbox is faster
-        return f"{centroid_x-100},{centroid_y-100},{centroid_x+100},{centroid_y+100}"
+        return f"{centroid_x-10},{centroid_y-10},{centroid_x+10},{centroid_y+10}"
 
-    def _get_roof_attributes(self, request_ids: list):
-        roof_attributes = {} #TODO: we might want to request asynchronously
-        for id, data in tqdm(zip(request_ids, self.result), desc='Getting the roof data', total=len(request_ids)):
-            bbox = self._get_bbox(id, data)
-            roof_attributes[id] = roofmetrics(id, bbox)
-        return roof_attributes
+    async def _get_roof_attributes(self, id: str, data: dict, session):
+        bbox = self._get_bbox(id, data)
+        return await roofmetrics(id, bbox, session=session)
 
     def _set_request_ids(self, all_ids, force_new=False):
         self.request_ids = []
@@ -144,49 +147,39 @@ class collection():
         elif existing_files > 0:
             print(f"{existing_files} out of {len(all_ids)} files already exist, so {len(all_ids) - existing_files} more request(s) are needed.")
 
-    async def async_request_data(self):
-        all_urls = [self._make_url(id) for id in self.request_ids]
-        bag_attributes = self._get_bag_attributes(self.request_ids)
-        self.result = await request_url_list(all_urls)
-        roof_attributes = self._get_roof_attributes(self.request_ids)
-
-        # convert to the right format and save the data, this is not async because the data is already fetched
-        for id, data in zip(self.request_ids, self.result): # TODO: check if id corresponds to the id in the data
-            if data is None:
-                continue
-            cityjson = self._convert_to_cityjson(data, bag_attributes, roof_attributes, id)
-            self._save(cityjson, id) # use request_ids to get the right id without the pre- and suffix
-        if self._verbose: #TODO: doesn't work anymore as we save all results
-            print(f"{len(all_urls)-len(self.result)} errors occurred while requesting the data.")
-
-    def _request_data(self):
-        #TODO: implement this function
-        error_count = 0
-        if self._verbose:
-            print("Asyncio is already running, so the requests will be done synchronously. Note that this is not the most efficient way.")
-        for id in self.request_ids: # TODO: add a progress bar
+    async def _async_collect_building(self, id):
+        async with self.semaphore:
             try:
-                r = requests.get(self._make_url(id))
-                cityjson = self._convert_to_cityjson(r.json(), bag_attributes, id) #TODO: make it work properly with bag_attributes
-                self._save(cityjson, id)
-            except:
-                error_count += 1
+                async with aiohttp.ClientSession() as session:
+                    tasks = [self._get_3d_bag(id, session), self._get_additional_bag_attributes(id, session)]
+                    bag3d_data, bag_attributes = await asyncio.gather(*tasks)
+                    roof_attributes = await self._get_roof_attributes(id, bag3d_data, session)
+                cityjson = self._convert_to_cityjson(bag3d_data, bag_attributes, roof_attributes, id)
+                self._save(cityjson, id) # use request_ids to get the right id without the pre- and suffix
+            except aiohttp.ClientError as e:
+                print(f"Request for {id} failed: {e}")
+                self.errors += 1
+            self.bar.update(1)
+
+    async def async_request_data(self):
+        self.errors = 0
+        self.bar = tqdm(total=len(self.request_ids), desc="Requesting data", position=0, leave=True)
+
+        self.semaphore = asyncio.Semaphore(50)
+        tasks = [self._async_collect_building(id) for id in self.request_ids]
+        await asyncio.gather(*tasks)
+        self.bar.close()
+
         if self._verbose:
-            print(f"{error_count} errors occurred while requesting the data.")
+            print(f"{self.errors} error(s) occurred while requesting the data.")
 
     def collect_id_list(self, all_ids: list, force_new=False):
         """Requests and save the data in cityjson format for all the ids in the list."""
-
         self._check_bag_data_folder()
 
         # Remove the prefix from the ids so they are consistent. also check if the file already exists to avoid unnecessary requests
         self._set_request_ids(all_ids, force_new)
 
-        # if asyncio is running, do the requests synchronously
-        if len(self.request_ids) and asyncio.get_event_loop().is_running(): #TODO: this doesn't work if you run the class twice
-            raise NotImplementedError("The async_request_data function cannot be called while asyncio is running.")
-        # if asyncio is not running, use the async function
-        elif len(self.request_ids):
+        if len(self.request_ids):
             asyncio.run(self.async_request_data())
         # else: there is no data to request
-        
