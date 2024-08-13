@@ -28,7 +28,7 @@ async def roofmetrics(bagid=None, bbox=None, verbose=False, session=None):
     
     url = "https://data.3dbag.nl/api/BAG3D/wfs"
     if session is None:
-        with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession() as session:
             r = await session.get(url, params=params)
             r.raise_for_status()
             r = await r.text()
