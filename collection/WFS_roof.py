@@ -1,5 +1,6 @@
 import geopandas as gpd
 import geojson
+import aiohttp
 
 async def roofmetrics(bagid=None, bbox=None, verbose=False, session=None):
     """
@@ -26,10 +27,15 @@ async def roofmetrics(bagid=None, bbox=None, verbose=False, session=None):
         )
     
     url = "https://data.3dbag.nl/api/BAG3D/wfs"
-
-    r = await session.get(url, params=params)
-    r.raise_for_status()
-    r = await r.text()
+    if session is None:
+        with aiohttp.ClientSession() as session:
+            r = await session.get(url, params=params)
+            r.raise_for_status()
+            r = await r.text()
+    else:
+        r = await session.get(url, params=params)
+        r.raise_for_status()
+        r = await r.text()
     
 
     # Create GeoDataFrame from geojson and set coordinate reference system
