@@ -11,16 +11,19 @@ class MergeCityJSON:
     Note that there are several format that are very similar to CityJSON, 
     such as CityJSONL, CityGML, and GeoJSON. This repo only handles CityJSON files."""
 
-    def __init__(self, input_folder: str, output_folder: str = None):
+    def __init__(self, input_folder: str, output_folder: str = None, all_ids: list = None):
         self.input_folder = input_folder
         self.output_folder = output_folder
+        self.all_ids = all_ids
 
     def merge_objects(self):
-        if len(self.all_objects) > 1:
+        if len(self.all_objects) == 0:
+            raise Exception("No objects found to merge. Please check the input folder and if applicable, the all_ids list.")
+        elif len(self.all_objects) == 1:
+            print("WARNING: Only one object found, no need to merge.") # the first obj is just used as the "merged" obj
+        else:
             # merge the other objects into the first object, otherwise return the first object
             self.all_objects[0].merge(self.all_objects[1:])
-        else:
-            print("WARNING: Only one object found, no need to merge.")
         self.merged_obj = self.all_objects[0].j # is the merged object in json format
 
     def load_objects(self):
@@ -30,10 +33,9 @@ class MergeCityJSON:
             if 'merged' in file:
                 merge_count += 1
                 continue
-            elif file.endswith('city.json'):
+            elif file.endswith('city.json') and (self.all_ids is None or file.split('.')[0] in self.all_ids):
                 cm = CityJSON(open(f"{self.input_folder}/{file}", 'r'))
                 all_objects.append(cm)
-
         if merge_count > 0:
             print(f"""WARNING: {merge_count} merged file(s) found in the folder that you use for the merge of cityjson files
                   , they are not included in the merge as they are already merged.""")
@@ -75,7 +77,3 @@ class MergeCityJSON:
         # save the merged object
         self.create_output_name()
         self.save()
-
-if __name__ == '__main__':
-    merger = MergeCityJSON(r'input_folder', 'test_output')
-    merger.run()

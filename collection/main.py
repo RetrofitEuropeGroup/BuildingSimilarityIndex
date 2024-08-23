@@ -16,8 +16,9 @@ class collection():
     and it request it from the 3D-BAG, then it saves the data in cityjson format to the bag_data folder.
     """
 
-    def __init__(self, bag_data_folder: str, verbose: bool = False):
+    def __init__(self, bag_data_folder: str, all_ids: list, verbose: bool = False):
         self._bag_data_folder = bag_data_folder
+        self.all_ids = all_ids
         self._verbose = verbose # TODO: integrate this in the request function
         self.key = self._get_key()
 
@@ -48,13 +49,6 @@ class collection():
 
     def _make_url(self, id: str):
         return f"https://api.3dbag.nl/collections/pand/items/NL.IMBAG.Pand.{id}"
-
-    def convert_id(self, id: str):
-        if id.startswith("NL.IMBAG.Pand."): # remove the prefix if it is there
-            id = id[14:]
-        if '-' in id: # remove the suffix if it is there
-            id = id.split('-')[0]
-        return id
 
     def _save(self, cityjson: dict, id: str):
         """Saves the CityJSON data to a file."""
@@ -124,11 +118,11 @@ class collection():
         bbox = self._get_bbox(id, data)
         return await roofmetrics(id, bbox, session=session)
 
-    def _set_request_ids(self, all_ids, force_new=False):
+    def _set_request_ids(self, force_new=False):
+        """Sets the request_ids attribute to a list of ids that are not already saved on the machine."""
         self.request_ids = []
         existing_files = 0
-        for id in all_ids:
-            id = self.convert_id(id)
+        for id in self.all_ids:
 
             if force_new == False and os.path.exists(f"{self._bag_data_folder}/{id}.city.json"):
                 existing_files += 1
@@ -136,10 +130,10 @@ class collection():
                 self.request_ids.append(id)
 
         # check how many requests are needed
-        if existing_files == len(all_ids):
+        if existing_files == len(self.all_ids):
             print("All the requested data is already saved on the machine, no new requests are needed.")
         elif existing_files > 0:
-            print(f"{existing_files} out of {len(all_ids)} files already exist, so {len(all_ids) - existing_files} more request(s) are needed.")
+            print(f"{existing_files} out of {len(self.all_ids)} files already exist, so {len(self.all_ids) - existing_files} more request(s) are needed.")
 
     async def _async_collect_building(self, id):
         async with self.semaphore:
@@ -170,12 +164,12 @@ class collection():
         if self._verbose:
             print(f"{self.errors} error(s) occurred while requesting the data.")
 
-    def collect_id_list(self, all_ids: list, force_new=False):
+    def collect_id_list(self, force_new=False):
         """Requests and save the data in cityjson format for all the ids in the list."""
         self._check_bag_data_folder()
 
         # Remove the prefix from the ids so they are consistent. also check if the file already exists to avoid unnecessary requests
-        self._set_request_ids(all_ids, force_new)
+        self._set_request_ids(force_new)
 
         if len(self.request_ids):
             asyncio.run(self.async_request_data())
