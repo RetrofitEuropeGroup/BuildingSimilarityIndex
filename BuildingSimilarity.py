@@ -1,7 +1,7 @@
 import sys
 import os
 
-module_dir = os.path.dirname(os.path.realpath(__file__))
+module_dir = os.path.dirname(os.path.realpath(__file__)) # add the path of the module so it can be found
 sys.path.append(module_dir)
 
 from collection import collection
