@@ -63,7 +63,6 @@ class processing():
         for col in feature_space_merged.columns:
             if feature_space_merged[col].dtype == bool:
                 feature_space_merged[col] = feature_space_merged[col].astype(int)
-                print('Converted column', col, 'to int') #TODO: remove after full pipeline run
         return feature_space_merged
 
     def run(self):
