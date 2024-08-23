@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from sklearn.metrics.pairwise import euclidean_distances
 
+from similarity_calculation import utils
 
 class similarity:
     def __init__(self, feature_space_file: str, column_weights: dict = None, columns: list = None):
@@ -125,53 +126,23 @@ class similarity:
 
         # if all good, return the ids
         return id1, id2
-    
-    # function to calculate the distance matrix
-    def _mirror(self, matrix):
-        upper_tri = np.triu(matrix)
-        lower_tri = upper_tri.T
-        mirrored_matrix = upper_tri + lower_tri
-        return mirrored_matrix
 
-    def save(self, matrix, path, header, fmt='%f'):
-        if matrix.shape[0] == matrix.shape[1]:
-            matrix = self._mirror(matrix)
-        
-        parent_dir = os.path.dirname(path)
-        if os.path.isdir(parent_dir) == False:
-            os.mkdir(parent_dir)
-        np.savetxt(path, matrix, delimiter=",", fmt=fmt, header=header, comments='')
-        return matrix
-
-    def _check_csv(self, path):
-        if isinstance(path, str) and path.endswith('.csv') == False:
-            raise ValueError("the path must end with '.csv'")
-
-    def _update_matrix(self, row, matrix):
-        if matrix.size == 0:
-                matrix = row
+    def _update_matrix(self, id1, other_ids, ref, n_zero_distances=0):
+        # calculate the distance between the object and all other
+        row = np.array([0] * n_zero_distances)
+        for id2 in other_ids:
+            dist = self.calculate_distance(id1, id2, ref)
+            row = np.append(row, round(dist, 5))
+        self.progress.update(len(other_ids))
+        # update the matrix itself
+        if hasattr(self, 'matrix'):
+            self.matrix = np.vstack((self.matrix, row))
         else:
-            matrix = np.vstack((matrix, row))
-        return matrix
-
-    def plot_matrix(self, matrix, all_ids):
-        if matrix.shape[0] != matrix.shape[1]:
-            raise ValueError("Matrix is not square, cannot plot")
-        if matrix.shape[0] != len(all_ids):
-            raise ValueError("Number of ids does not match the matrix dimensions")
-        if len(all_ids) > 50:
-            raise ValueError("Too many ids to plot, max 50 ids allowed")
-        
-        plt.matplotlib.pyplot.matshow(matrix)
-        plt.xticks(range(len(all_ids)), all_ids, rotation=90)
-        plt.yticks(range(len(all_ids)), all_ids)
-        plt.colorbar()
-        plt.show()
+            self.matrix = row
 
     def calculate_distance(self, id1, id2, ref=False):
         if hasattr(self, 'prepared_df') == False:
             self.prepared_df = self._prepare_data(self.feature_space_file)
-
         id1, id2 = self._check_ids(id1, id2)
 
         # for obj2 consider the reference geopandas dataframe if it is given, otherwise use the original geopandas dataframe
@@ -186,105 +157,70 @@ class similarity:
 
     def calculate_similarity(self, id1, id2):
         dist = self.calculate_distance(id1, id2)
-        # if self.column_weights is not None:
-        #     normalized_dist = dist / sum(self.column_weights.values())
-        # else:
-        #     normalized_dist = dist / len(self.columns)
         return 1 / (1 + dist)
 
     def distance_matrix_reference(self,
                                 reference_feature_space: str,
-                                dist_matrix_path: str = None,
+                                dist_matrix_path: str,
                                 save_interval: int = 100):
         """ a distance matrix, but the x-axis are reference objects and the y-axis 
         are the objects that are compared to the reference objects. The y-axis objects
         are from the original geopandas dataframe, the x-axis objects are from the
         reference geopandas dataframe."""
-        # TODO: split this & the regular distance matrix function into smaller functions, which can be reused
-        self._check_csv(dist_matrix_path)
+        utils.check_csv(dist_matrix_path)
 
         if hasattr(self, 'prepared_df') == False:
             self.prepared_df, self.prepared_df_ref = self._prepare_data(self.feature_space_file, reference_feature_space)
         # create an empty matrix and get all ids
-        matrix = np.array([])
         reference_ids = self.prepared_df_ref["id"].values
         all_ids = self.prepared_df["id"].values
-
-        fmt = '%s'
         header = 'id,' + ",".join(reference_ids)
 
-        progress = tqdm(total=len(all_ids)*len(reference_ids), desc="Calculating distance matrix")
+        self.progress = tqdm(total=len(all_ids)*len(reference_ids), desc="Calculating distance matrix")
         # loop over all objects and calculate the distance to the reference objects
         for id1 in all_ids:
-            row = np.array([id1])
-            for id2 in reference_ids:
-                dist = self.calculate_distance(id1, id2, ref=True)
-                row = np.append(row, round(dist, 5))
-            matrix = self._update_matrix(row, matrix)
+            self._update_matrix(id1, reference_ids, ref=True)
             
-            progress.update(len(reference_ids)) # update the progress bar
             # save the matrix to a file if the interval is reached
-            if isinstance(dist_matrix_path, str) and matrix.ndim > 1 and matrix.shape[0] % save_interval == 0:
-                self.save(matrix, dist_matrix_path, header, '%s')
-        progress.close()
+            if isinstance(dist_matrix_path, str) and self.matrix.ndim > 1 and self.matrix.shape[0] % save_interval == 0:
+                utils.save_matrix(self.matrix, dist_matrix_path, header, index=all_ids)
+        self.progress.close()
 
         # make sure the full matrix is saved, or just return the matrix
         if isinstance(dist_matrix_path, str):
-            self.save(matrix, dist_matrix_path, header, fmt=fmt)
-            print(f"Distance matrix calculated and saved to '{dist_matrix_path}'")
+            utils.save_matrix(self.matrix, dist_matrix_path, header, index=all_ids)
+            print(f'Distance matrix calculated and saved to "{dist_matrix_path}"')
         else:
             print("Distance matrix calculated")    
-        return matrix
+        return self.matrix
 
-    def distance_matrix_regular(self, dist_matrix_path: str = None, save_interval: int = 100, plot_matrix: bool = False):
-        self._check_csv(dist_matrix_path)
+    def distance_matrix_regular(self, dist_matrix_path: str, save_interval: int = 100, plot_matrix: bool = False):
+        utils.check_csv(dist_matrix_path)
         
         if hasattr(self, 'prepared_df') == False:
             self.prepared_df = self._prepare_data(self.feature_space_file)
 
-        # create an empty matrix and get all ids
+        # get all ids
         all_ids = self.prepared_df["id"].values
-        header = ",".join(all_ids)
-        matrix = np.array([])
+        header = 'id,' + ",".join(all_ids)
 
         # calculate the distance between all objects
         total_jobs = int(len(all_ids) * (len(all_ids) - 1) / 2)
-        progress = tqdm(total=total_jobs, desc="Calculating distance matrix")
+        self.progress = tqdm(total=total_jobs, desc="Calculating distance matrix")
         for i, id1 in enumerate(all_ids):
-            row = np.array([0]*(i+1)) # set zero for all ids before the diagonal
-            for id2 in all_ids[i+1:]:
-                dist = self.calculate_distance(id1, id2)
-                row = np.append(row, round(dist, 5))
+            self._update_matrix(id1, all_ids[i+1:], ref=False, n_zero_distances=i+1)
 
-            # add row to matrix
-            if matrix.size == 0:
-                matrix = row
-            else:
-                matrix = np.vstack((matrix, row))
-            progress.update(len(all_ids) - i - 1)
-            
             # save the matrix to a file if the interval is reached
-            if isinstance(dist_matrix_path, str) and matrix.ndim > 1 and matrix.shape[0] % save_interval == 0:
-                self.save(matrix, dist_matrix_path, header)
+            if isinstance(dist_matrix_path, str) and self.matrix.ndim > 1 and self.matrix.shape[0] % save_interval == 0:
+                mirrored_matrix = utils.save_matrix(self.matrix, dist_matrix_path, header, index=all_ids[:i+1])
                 #TODO: just append the new rows to the file instead of saving the whole matrix
-        progress.close()
-
+        self.progress.close()
+        
         # make sure the full matrix is saved
-        if isinstance(dist_matrix_path, str):
-            mirrored_matrix = self.save(matrix, dist_matrix_path, header)
-            print("Distance matrix calculated and saved to 'distance_matrix.csv'")
-        else:
-            mirrored_matrix = self._mirror(matrix)
-            print("Distance matrix calculated")
+        mirrored_matrix = utils.save_matrix(self.matrix, dist_matrix_path, header, index=all_ids)
+        print(f'INFO: Regular distance matrix calculated and saved to "{dist_matrix_path}"')
         
         if plot_matrix:
-            self.plot_matrix(mirrored_matrix, all_ids)
+            utils.plot_matrix(mirrored_matrix, all_ids)
 
-        return mirrored_matrix, all_ids
-
-if __name__ == '__main__':
-    #TODO prio: check if everything works with the -0 / NL.IMBAG.Pand and without those
-
-    sim = similarity("data/feature_space/feature_space.csv")
-    # sim.distance_matrix_regular(plot_matrix=True)
-    sim.distance_matrix_reference("data/feature_space/feature_space copy.csv", 'test.csv')
+        return mirrored_matrix, all_ids   
