@@ -54,7 +54,7 @@ class processing():
         feature_space_metrics = calculate_metrics(input=self._merged_file, jobs=n_processors, verbose=self._verbose)
 
         # execute the turning function
-        feature_space_tf = perform_turning_function(feature_space_metrics)
+        feature_space_tf = perform_turning_function(feature_space_metrics, metric='l2')
 
         # merge the results in one data frame & return the df
         feature_space_merged = feature_space_metrics.merge(feature_space_tf, on='id')
@@ -75,7 +75,7 @@ class processing():
         # calculate the 2d / 3d metrics and turning function features
         # TODO: create a single progress bar
         self.feature_space = self._create_feature_space()
-        if self._categorical_columns is not None:
+        if self._categorical_columns is not None: # if there are categorical columns, convert them to dummies (one hot encoding)
             self.feature_space = pd.get_dummies(self.feature_space, columns=self._categorical_columns, dtype=int)
 
         self.feature_space.to_csv(self.feature_space_file)
