@@ -298,8 +298,8 @@ def process_building(building,
         b3_hellingshoek_proxy = None
 
     values = {
-        "actual_volume": fixed.volume,
-        "convex_hull_volume": ch_volume,
+        "actual_volume": round(fixed.volume, 2),
+        "convex_hull_volume": round(ch_volume, 2),
         "oorspronkelijkbouwjaar": building['attributes']['oorspronkelijkbouwjaar'],
         "b3_opp_buitenmuur": building['attributes']['b3_opp_buitenmuur'],
         "b3_opp_dak_plat": building['attributes']['b3_opp_dak_plat'],
@@ -307,7 +307,7 @@ def process_building(building,
         "b3_opp_grond": building['attributes']['b3_opp_grond'],
         "b3_opp_scheidingsmuur": building['attributes']['b3_opp_scheidingsmuur'],
         "b3_bouwlagen": building['attributes']['b3_bouwlagen'],
-        "b3_hellingshoek_proxy": b3_hellingshoek_proxy,
+        "b3_hellingshoek_proxy": round(b3_hellingshoek_proxy,2),
         "aantal_verblijfsobjecten": building['attributes'].get("aantal_verblijfsobjecten", []),
         "totaal_oppervlakte": building['attributes'].get("totaal_oppervlakte"),
         "main_roof_parts": building['attributes'].get("main_roof_parts"),
@@ -326,7 +326,7 @@ def process_building(building,
     grid = voxel.cell_centers().points
 
     builder = StatValuesBuilder(values, custom_indices)
-
+    # TODO: we might want to round this to 2 decimals to save storage space
     builder.add_index("circularity_2d", lambda: si.circularity(shape))
     builder.add_index("hemisphericality_3d", lambda: si.hemisphericality(fixed))
     builder.add_index("convexity_2d", lambda: shape.area / shape.convex_hull.area)
