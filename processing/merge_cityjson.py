@@ -28,18 +28,12 @@ class MergeCityJSON:
 
     def load_objects(self):
         all_objects = []
-        merge_count = 0
         for file in os.listdir(self.input_folder):
             if 'merged' in file:
-                merge_count += 1
                 continue
             elif file.endswith('city.json') and (self.all_ids is None or file.split('.')[0] in self.all_ids):
                 cm = CityJSON(open(f"{self.input_folder}/{file}", 'r'))
                 all_objects.append(cm)
-        if merge_count > 0:
-            print(f"""WARNING: {merge_count} merged file(s) found in the folder that you use for the merge of cityjson files
-                  , they are not included in the merge as they are already merged.""")
-
         self.all_objects = all_objects
 
     def prepare_output_folder(self):

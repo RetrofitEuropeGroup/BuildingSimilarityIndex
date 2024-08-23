@@ -40,9 +40,7 @@ class processing():
     # main functions
     def _merge_files(self):
         """ Merges the files in the input folder to a single file"""
-        # TODO: make sure only the files that are in all_ids are merged 
-        merge_folder = Path(self._bag_data_folder + '_merged') # create a new folder, if needed, for the merged files
-        merger = MergeCityJSON(self._bag_data_folder, output_folder=merge_folder, all_ids=self._all_ids)
+        merger = MergeCityJSON(self._bag_data_folder, output_folder=self._bag_data_folder, all_ids=self._all_ids)
         merger.run()
 
         self._merged_file = merger.file_path
