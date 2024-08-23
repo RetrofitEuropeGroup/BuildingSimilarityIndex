@@ -135,7 +135,6 @@ class similarity:
 
     def save(self, matrix, path, header, fmt='%f'):
         if matrix.shape[0] == matrix.shape[1]:
-            print("Matrix is square")
             matrix = self._mirror(matrix)
         
         parent_dir = os.path.dirname(path)
