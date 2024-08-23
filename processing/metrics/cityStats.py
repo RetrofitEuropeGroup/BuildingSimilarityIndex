@@ -110,7 +110,7 @@ def clean_df(df, verbose=True):
     # let the user know how many buildings have been filtered out
     rows_lost_perc = 1 - len(clean) / len(df)
     if verbose and rows_lost_perc == 0:
-        print("INFO: All buildings are suitable for processing. None have been filtered out.")
+        print("INFO: All buildings are suitable for processing. None have been filtered out.") #TODO: this is not true, as we filter out buildings with errors in the val3dity report
     elif verbose:
         print(f"""INFO: {rows_lost_perc:.2%} of the buildings has been filtered out as it did not meet one of the requirements, note that buildings can be filtered out for multiple reasons and thus may count multiple times:
         {perc_convex:.2%} \t has a actual_volume that is larger than convex_hull_volume
