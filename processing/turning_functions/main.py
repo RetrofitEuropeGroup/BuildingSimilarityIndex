@@ -236,19 +236,17 @@ def rectangularity(pol):
     """
     return (pol.area/pol.minimum_rotated_rectangle.area)
 
-def polygon_to_new_space(pol, feature_space, additional_functions=[convexity, rectangularity], metric='l1'):
-    """Polygon_to_new_space: pol(shapely.geometry.polygon), feature_space(list(shapely.geometry.polygon)), additional_functions(list(lambda(shapely.pol) -> float)), metric: string
-    Takes a polygon and computes the turning function distance to the set of reference polygons provided in 'feature_space'.
-    Other indices/features can be provided in 'additional_functions' in the form of a function mapping a shapely.geometry.polygon to a float.
-    By default, adds convexity and rectangularity."""
+def polygon_to_new_space(pol, feature_space, metric='l1'):
+    """Polygon_to_new_space: pol(shapely.geometry.polygon), feature_space(list(shapely.geometry.polygon)), metric: string
+    Takes a polygon and computes the turning function distance to the set of reference polygons provided in 'feature_space'."""
     pol_coords = to_list(pol.exterior.coords)
-    return np.array([minimize_dist(pol_coords, feature_space[i], metric=metric) for i in range(len(feature_space))]+[i(pol) for i in additional_functions])
+    return np.array([minimize_dist(pol_coords, feature_space[i], metric=metric) for i in range(len(feature_space))])
 
-def make_space(pol_list, features, additional_functions=[convexity, rectangularity], metric='l1'):
+def make_space(pol_list, features, metric='l1'):
     """make_space: constructs feature space from list of polygons. See polygon_to_new_space for details on how each instance is transformed to the feature space."""
     res = np.zeros((len(pol_list),len(features)))
     for i in tqdm(range(len(pol_list)), desc="Executing the turning function "):
-        res[i,:] = polygon_to_new_space(pol_list[i], feature_space=features, additional_functions=additional_functions, metric=metric)
+        res[i,:] = polygon_to_new_space(pol_list[i], feature_space=features, metric=metric)
     return res
 
 
@@ -263,7 +261,7 @@ def translate_pol(pol):
 
 def round_polygon(pol, decimals=1, simplify_tolerance=0.2):
     """Rounds the coordinates of a polygon to the nearest tolerance and decimals."""
-    pol = pol.simplify(tolerance=0.2)
+    pol = pol.simplify(tolerance=simplify_tolerance)
     xx, yy = pol.exterior.coords.xy
     xx = np.round(xx.tolist(), decimals)
     yy = np.round(yy.tolist(), decimals)
@@ -293,19 +291,9 @@ def perform_turning_function(df,
     pols = [round_polygon(translate_pol(i)) for i in pols]
 
     # create the feature space based on the turning function and save it to a dataframe
-    feature_space = make_space(pols, features=[polygon_to_vector(i) for i in reference_shapes.geometry], metric=metric, additional_functions=[])
-    columns = list(f"turning_function_{i}" for i in range(len(reference_shapes.geometry))) + additional_functions_names
+    feature_space = make_space(pols, features=[polygon_to_vector(i) for i in reference_shapes.geometry], metric=metric)    
+    columns = list(f"turning_function_{i}" for i in range(len(reference_shapes.geometry)))
     df_turning_function = pd.DataFrame(feature_space, columns=columns)
     df_turning_function = df_turning_function.set_index(df.index)
     
     return df_turning_function
-
-
-if __name__ == "__main__":
-    df_path = r"C:\Users\timos\OneDrive - HAN\Future Factory\FF_BuildingSimilarityIndex\data\gpkg\testcase_overvecht.gpkg"
-    # df_path = r"C:\Users\timos\OneDrive - HAN\Future Factory\FF_BuildingSimilarityIndex\data\gpkg\test.gpkg"
-    df = gpd.read_file(df_path)
-    print(len(df))
-
-    df_turning_function = perform_turning_function(df_path, metric='l2')
-    print(df_turning_function)
