@@ -291,14 +291,9 @@ def perform_turning_function(df,
     if type(pols[0]) == shapely.geometry.MultiPolygon:
         pols = [list(i.geoms)[0] for i in pols]
     pols = [round_polygon(translate_pol(i)) for i in pols]
-    
-    # define additional functions if wanted
-    # TODO: is this necessary?
-    additional_functions = []
-    additional_functions_names = []
 
     # create the feature space based on the turning function and save it to a dataframe
-    feature_space = make_space(pols, features=[polygon_to_vector(i) for i in reference_shapes.geometry], metric=metric, additional_functions=additional_functions)
+    feature_space = make_space(pols, features=[polygon_to_vector(i) for i in reference_shapes.geometry], metric=metric, additional_functions=[])
     columns = list(f"turning_function_{i}" for i in range(len(reference_shapes.geometry))) + additional_functions_names
     df_turning_function = pd.DataFrame(feature_space, columns=columns)
     df_turning_function = df_turning_function.set_index(df.index)
