@@ -1,4 +1,3 @@
-import sys
 import json
 import os
 import asyncio
@@ -9,8 +8,6 @@ import random
 
 dotenv.load_dotenv() # load the api key for the bag for the .env file
 
-parent_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-sys.path.append(parent_dir)
 from collection.WFS_roof import roofmetrics
 
 class collection():

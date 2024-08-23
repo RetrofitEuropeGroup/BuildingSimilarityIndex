@@ -2,9 +2,10 @@
 
 import numpy as np
 import pyvista as pv
-from helpers.geometry import plane_params, project_mesh, to_3d
 from scipy.spatial import distance_matrix
 from sklearn.cluster import AgglomerativeClustering
+
+from processing.metrics.helpers.geometry import plane_params, project_mesh, to_3d
 
 def get_points_of_type(mesh, surface_type):
     """Returns the points that belong to the given surface type"""

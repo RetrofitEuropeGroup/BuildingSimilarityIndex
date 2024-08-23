@@ -1,15 +1,11 @@
 import os
-import sys
 from pathlib import Path
 import pandas as pd
 
 # add the path of the own directory to the system path so that the modules can be imported
-file_dir = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(file_dir)
-
-from merge_cityjson import MergeCityJSON
-from metrics.cityStats import calculate_metrics
-from turning_functions.main import perform_turning_function
+from processing.merge_cityjson import MergeCityJSON
+from processing.metrics.cityStats import calculate_metrics
+from processing.turning_functions.main import perform_turning_function
 
 class processing():
     def __init__(self, feature_space_file: str, bag_data_folder: str = None, categorical_columns: list = None, verbose: bool = False):

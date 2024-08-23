@@ -1,6 +1,5 @@
 import json
 import os
-import sys
 import math
 
 import numpy as np
@@ -12,13 +11,9 @@ import scipy.spatial as ss
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-# add the path of the own directory to the system path so that our own modules can be imported
-file_dir = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(file_dir)
-
-import cityjson as cityjson
-import geometry as geometry
-import shape_index as si
+import processing.metrics.cityjson as cityjson
+import processing.metrics.geometry as geometry
+import processing.metrics.shape_index as si
 
 def compute_stats(values, percentile = 90, percentage = 75):
     """

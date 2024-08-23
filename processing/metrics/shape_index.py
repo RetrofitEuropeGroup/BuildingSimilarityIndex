@@ -2,18 +2,15 @@
 
 import math
 from shapely.geometry import Point, MultiPoint, Polygon
-from helpers.geometry import surface_normal
-from helpers.smallestenclosingcircle import make_circle
-try:
-    from helpers.mesh import to_pymesh, to_pyvista, intersect
-    pymesh_exists = True
-except:
-    # print("WARNING: pymesh not found! Exchange index calculation will be omitted...")
-    pymesh_exists = False
+from processing.metrics.helpers.geometry import surface_normal
+from processing.metrics.helpers.smallestenclosingcircle import make_circle
+
 import miniball
 import numpy as np
 import pyvista as pv
+
 # import pymesh
+pymesh_exists = False
 
 def circularity(shape):
     """Returns circularity 2D for a given polygon"""

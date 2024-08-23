@@ -1,3 +1,9 @@
+import sys
+import os
+
+module_dir = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(module_dir)
+
 from collection import collection
 from processing import processing
 from similarity_calculation import similarity

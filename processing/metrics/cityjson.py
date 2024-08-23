@@ -2,8 +2,9 @@
 
 import numpy as np
 from shapely.geometry import Polygon, MultiPolygon
-from helpers.geometry import triangulate_polygon
 import pyvista as pv
+
+from processing.metrics.helpers.geometry import triangulate_polygon
 
 def get_surface_boundaries(geom):
     """Returns the boundaries for all surfaces"""
