@@ -248,7 +248,7 @@ class similarity:
         matrix = np.array([])
 
         # calculate the distance between all objects
-        total_jobs = len(all_ids) * (len(all_ids) - 1) / 2
+        total_jobs = int(len(all_ids) * (len(all_ids) - 1) / 2)
         progress = tqdm(total=total_jobs, desc="Calculating distance matrix")
         for i, id1 in enumerate(all_ids):
             row = np.array([0]*(i+1)) # set zero for all ids before the diagonal
