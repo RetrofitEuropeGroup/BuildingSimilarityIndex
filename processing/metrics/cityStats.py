@@ -110,7 +110,7 @@ def clean_df(df, verbose=True):
     # let the user know how many buildings have been filtered out
     rows_lost_perc = 1 - len(clean) / len(df)
     if verbose and rows_lost_perc == 0:
-        print("INFO: All buildings are suitable for processing. None have been filtered out.")
+        print("INFO: All buildings are suitable for processing. None have been filtered out.") #TODO: this is not true, as we filter out buildings with errors in the val3dity report
     elif verbose:
         print(f"""INFO: {rows_lost_perc:.2%} of the buildings has been filtered out as it did not meet one of the requirements, note that buildings can be filtered out for multiple reasons and thus may count multiple times:
         {perc_convex:.2%} \t has a actual_volume that is larger than convex_hull_volume
@@ -298,8 +298,8 @@ def process_building(building,
         b3_hellingshoek_proxy = None
 
     values = {
-        "actual_volume": fixed.volume,
-        "convex_hull_volume": ch_volume,
+        "actual_volume": round(fixed.volume, 2),
+        "convex_hull_volume": round(ch_volume, 2),
         "oorspronkelijkbouwjaar": building['attributes']['oorspronkelijkbouwjaar'],
         "b3_opp_buitenmuur": building['attributes']['b3_opp_buitenmuur'],
         "b3_opp_dak_plat": building['attributes']['b3_opp_dak_plat'],
@@ -307,7 +307,7 @@ def process_building(building,
         "b3_opp_grond": building['attributes']['b3_opp_grond'],
         "b3_opp_scheidingsmuur": building['attributes']['b3_opp_scheidingsmuur'],
         "b3_bouwlagen": building['attributes']['b3_bouwlagen'],
-        "b3_hellingshoek_proxy": b3_hellingshoek_proxy,
+        "b3_hellingshoek_proxy": round(b3_hellingshoek_proxy,2),
         "aantal_verblijfsobjecten": building['attributes'].get("aantal_verblijfsobjecten", []),
         "totaal_oppervlakte": building['attributes'].get("totaal_oppervlakte"),
         "main_roof_parts": building['attributes'].get("main_roof_parts"),
@@ -326,7 +326,7 @@ def process_building(building,
     grid = voxel.cell_centers().points
 
     builder = StatValuesBuilder(values, custom_indices)
-
+    # TODO: we might want to round this to 2 decimals to save storage space
     builder.add_index("circularity_2d", lambda: si.circularity(shape))
     builder.add_index("hemisphericality_3d", lambda: si.hemisphericality(fixed))
     builder.add_index("convexity_2d", lambda: shape.area / shape.convex_hull.area)
