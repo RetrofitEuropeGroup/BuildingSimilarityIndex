@@ -10,6 +10,6 @@ val3dity.log
 analysis/*
 processing/metrics/val3dity/*
 .env
-
+.idea
 # keep the folders that have a .gitkeep file, but ignore their contents
 !*.gitkeep
