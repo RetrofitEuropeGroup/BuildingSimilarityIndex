@@ -41,27 +41,3 @@ class BuildingSimilarity():
                 id = id.split('-')[0]
             formatted_ids.append(id)
         return formatted_ids
-
-if __name__ == "__main__":
-    import geopandas as gpd
-    import json
-
-    with open('analysis/column_weights.json', 'r') as f:
-        column_weights = json.load(f)
-    
-    if 1:
-        df = gpd.read_file(r'C:\Users\TimoScheidel\OneDrive - HAN\Future Factory\FF_BuildingSimilarityIndex\analysis\subset20k.gpkg')
-        all_ids = df['id'].tolist()
-        bs = BuildingSimilarity(bag_data_folder='data/20K', all_ids=all_ids[:10], verbose=True, column_weights=column_weights, feature_space_file='data/feature_space/fs_20k_test.csv')
-
-        bs.collection.collect_id_list(force_new=False)
-        bs.processing.run()
-    else:
-        all_ids = ["0153100000203775", "0153100000277229", "0772100000262212",
-        "0153100000213600", "0327100000255061", "0327100000258432",
-        "0327100000252015", "0327100000264673", "0307100000377568",
-        "0307100000326243", "0307100000337962", "0402100001519973"]
-        bs = BuildingSimilarity(bag_data_folder='data/voorbeelden', verbose=True, column_weights=column_weights, feature_space_file='data/feature_space/fs_voorbeelden.csv')
-        bs.collection.collect_id_list(all_ids, force_new=True)
-        bs.processing.run()
-    # bs.similarity.distance_matrix_reference(reference_feature_space='data/feature_space/fs_voorbeelden.csv', dist_matrix_path='data/distance_matrix/dm_reference3.csv')
