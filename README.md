@@ -1,3 +1,5 @@
+![3d project0002](https://github.com/user-attachments/assets/429e8d3f-425a-4f78-82b8-e90f867c2fdb)
+
 <h1 align="center">Welcome to FF_BuildingSimilarityIndex 👋</h1>
 <p>
   <img alt="Version" src="https://img.shields.io/badge/version-0.0.1-blue.svg?cacheSeconds=2592000" />
@@ -8,6 +10,7 @@
     <img alt="Maintenance" src="https://img.shields.io/badge/Maintained%3F-yes-green.svg" />
   </a>
 </p>
+
 
 A Python library based on [3d-building-metrics repo](https://github.com/tudelft3d/3d-building-metrics) to create a pipeline for the comparison of buildings. The library automatically collects the data from the [3D-BAG](https://docs.3dbag.nl/en/) and compares building based on the results of a turning function and metrics from the 3d-building-metrics repo. It consists of three modules: collection, processing and similarity_calculation. The modules are combined in one large module: BuildingsSimilarity. 
 
