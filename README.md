@@ -1,6 +1,6 @@
 ![3d project0002](https://github.com/user-attachments/assets/429e8d3f-425a-4f78-82b8-e90f867c2fdb)
 
-<h1 align="center">Welcome to FF_BuildingSimilarityIndex 👋</h1>
+<h1 align="center">Welcome to BuildingSimilarityIndex 👋</h1>
 <p>
   <img alt="Version" src="https://img.shields.io/badge/version-0.0.1-blue.svg?cacheSeconds=2592000" />
   <a href="https://github.com/RetrofitEuropeGroup/FF_BuildingSimilarityIndex#readme" target="_blank">
