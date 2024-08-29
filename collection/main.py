@@ -120,9 +120,6 @@ class collection():
 
     def _get_bbox(self, id: str, data: dict):
         """Get the bounding box of a building from the 3D-BAG API."""
-        if "NL.IMBAG.Pand." + id not in data['feature']['CityObjects']:
-            print(f"WARNING: Could not find the id {id} in the data.")
-            return None #TODO: remove after a while
         translate = data['metadata']['transform']['translate']
         centroid_x, centroid_y = translate[0], translate[1]
         return f"{centroid_x-10},{centroid_y-10},{centroid_x+10},{centroid_y+10}"
