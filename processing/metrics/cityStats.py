@@ -105,8 +105,8 @@ def clean_df(df, all_ids, val3dity_errors, verbose=True):
     
     
     perc_bag_errors = 1 - (len(df)+val3dity_errors) / len(all_ids)
-    lost_perc = f"""\t{perc_bag_errors:.2%} \t of the buildings had issues with the BAG data, meaning that they were not found in the BAG or had an error
-        {val3dity_errors/len(all_ids):.2%} \t of the buildings had issues with their 3d shape (val3dity report)"""
+    lost_perc = f"""\t{perc_bag_errors:.2%} \t has issues with the BAG data, meaning that they were not found in the BAG or had an error
+        {val3dity_errors/len(all_ids):.2%} \t has issues with their 3d shape (val3dity report)\n"""
     
     clean, perc_convex, perc_vol40, perc_holes = check_suitability(df, all_ids)
     clean = clean.drop(columns=["hole_count", 'min_vertical_elongation', 'max_vertical_elongation'], axis=1)
