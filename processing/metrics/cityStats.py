@@ -200,6 +200,7 @@ class StatValuesBuilder:
             self.__values[index_name] = "NC"
 
 def add_purpose_of_use(values, actual_use, id, verbose=False):
+    # TODO: make sure we delete the building is there is no actual_use / woonlaag & integrate it in clean_df
     if len(actual_use) == 0 and verbose:
         print(f'WARNING: No actual_use (gebruiksdoelen) found for building {id}')
 
