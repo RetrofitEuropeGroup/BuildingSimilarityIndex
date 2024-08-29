@@ -1,10 +1,9 @@
-import os
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 
 from tqdm import tqdm
 from sklearn.metrics.pairwise import euclidean_distances
+from sklearn.cluster import DBSCAN
 
 from similarity_calculation import utils
 
@@ -223,4 +222,19 @@ class similarity:
         if plot_matrix:
             utils.plot_matrix(mirrored_matrix, all_ids)
 
-        return mirrored_matrix, all_ids   
+        return mirrored_matrix, all_ids
+
+    def db_scan(self, eps=0.5, min_samples=5):
+        if hasattr(self, 'prepared_df') == False:
+            self.prepared_df = self._prepare_data(self.feature_space_file)
+        X = self.prepared_df.copy()
+
+        # drop rows with NaN values and save the ids as they are not relevant for the clustering
+        X.dropna(axis='rows', inplace=True)
+        ids = X['id']
+        X.drop('id', axis=1, inplace=True)
+
+        # perform the dbscan algorithm and add the cluster labels / identification to the dataframe
+        db = DBSCAN(eps=eps, min_samples=min_samples, n_jobs=-1).fit(X)
+        results = pd.DataFrame({'id': ids, 'cluster': db.labels_})
+        return results
