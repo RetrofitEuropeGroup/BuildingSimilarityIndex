@@ -290,6 +290,7 @@ def perform_turning_function(df,
         pols = [list(i.geoms)[0] for i in pols]
     pols = [round_polygon(translate_pol(i)) for i in pols]
 
+    # TODO: we could speed this up through parallelization
     # create the feature space based on the turning function and save it to a dataframe
     feature_space = make_space(pols, features=[polygon_to_vector(i) for i in reference_shapes.geometry], metric=metric)    
     columns = list(f"turning_function_{i}" for i in range(len(reference_shapes.geometry)))
