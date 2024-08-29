@@ -3,17 +3,17 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_matrix(matrix, all_ids):
+def plot_matrix(matrix, formatted_ids):
     if matrix.shape[0] != matrix.shape[1]:
         raise ValueError("Matrix is not square, cannot plot")
-    if matrix.shape[0] != len(all_ids):
+    if matrix.shape[0] != len(formatted_ids):
         raise ValueError("Number of ids does not match the matrix dimensions")
-    if len(all_ids) > 50:
+    if len(formatted_ids) > 50:
         raise ValueError("Too many ids to plot, max 50 ids allowed")
     
     plt.matplotlib.pyplot.matshow(matrix)
-    plt.xticks(range(len(all_ids)), all_ids, rotation=90)
-    plt.yticks(range(len(all_ids)), all_ids)
+    plt.xticks(range(len(formatted_ids)), formatted_ids, rotation=90)
+    plt.yticks(range(len(formatted_ids)), formatted_ids)
     plt.colorbar()
     plt.show()
 

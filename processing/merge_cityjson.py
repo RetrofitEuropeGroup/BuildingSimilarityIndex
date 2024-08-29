@@ -11,14 +11,14 @@ class MergeCityJSON:
     Note that there are several format that are very similar to CityJSON, 
     such as CityJSONL, CityGML, and GeoJSON. This repo only handles CityJSON files."""
 
-    def __init__(self, input_folder: str, output_folder: str = None, all_ids: list = None):
+    def __init__(self, input_folder: str, output_folder: str = None, formatted_ids: list = None):
         self.input_folder = input_folder
         self.output_folder = output_folder
-        self.all_ids = all_ids
+        self.formatted_ids = formatted_ids
 
     def merge_objects(self):
         if len(self.all_objects) == 0:
-            raise Exception("No objects found to merge. Please check the input folder and if applicable, the all_ids list.")
+            raise Exception("No objects found to merge. Please check the input folder and if applicable, the formatted_ids list.")
         elif len(self.all_objects) == 1:
             print("WARNING: Only one object found, no need to merge.") # the first obj is just used as the "merged" obj
         else:
@@ -31,7 +31,7 @@ class MergeCityJSON:
         for file in os.listdir(self.input_folder):
             if 'merged' in file:
                 continue
-            elif file.endswith('city.json') and (self.all_ids is None or file.split('.')[0] in self.all_ids):
+            elif file.endswith('city.json') and (self.formatted_ids is None or file.split('.')[0] in self.formatted_ids):
                 cm = CityJSON(open(f"{self.input_folder}/{file}", 'r'))
                 all_objects.append(cm)
         self.all_objects = all_objects

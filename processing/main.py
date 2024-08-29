@@ -8,7 +8,7 @@ from processing.metrics.cityStats import calculate_metrics
 from processing.turning_functions.main import perform_turning_function
 
 class processing():
-    def __init__(self, feature_space_file: str, bag_data_folder: str, all_ids: list, categorical_columns: list = None, verbose: bool = False):
+    def __init__(self, feature_space_file: str, bag_data_folder: str, formatted_ids: list, categorical_columns: list = None, verbose: bool = False):
         """
         Initializes an instance of the class that is used to process the data. Processing the data consists of 
         two steps: merging the files in the input folder to a single file (1) and creating a feature space from the merged file.
@@ -22,7 +22,7 @@ class processing():
             verbose (bool): If True, the progress will be printed. Defaults to False.
         """
         self._bag_data_folder = bag_data_folder
-        self._all_ids = all_ids
+        self._formatted_ids = formatted_ids
         self._categorical_columns = categorical_columns
         self._set_feature_space_file(feature_space_file)
         self._verbose = verbose
@@ -40,7 +40,7 @@ class processing():
     # main functions
     def _merge_files(self):
         """ Merges the files in the input folder to a single file"""
-        merger = MergeCityJSON(self._bag_data_folder, output_folder=self._bag_data_folder, all_ids=self._all_ids)
+        merger = MergeCityJSON(self._bag_data_folder, output_folder=self._bag_data_folder, formatted_ids=self._formatted_ids)
         merger.run()
 
         self._merged_file = merger.file_path
@@ -51,7 +51,7 @@ class processing():
         n_processors = max(os.cpu_count() - 1, 1)
 
         # run the citystats script in which the metrics are calculated
-        feature_space_metrics = calculate_metrics(input=self._merged_file, jobs=n_processors, all_ids = self._all_ids, verbose=self._verbose)
+        feature_space_metrics = calculate_metrics(input=self._merged_file, jobs=n_processors, formatted_ids = self._formatted_ids, verbose=self._verbose)
 
         # execute the turning function
         feature_space_tf = perform_turning_function(feature_space_metrics, metric='l2')

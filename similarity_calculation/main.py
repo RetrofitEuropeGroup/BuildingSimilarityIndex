@@ -172,22 +172,22 @@ class similarity:
             self.prepared_df, self.prepared_df_ref = self._prepare_data(self.feature_space_file, reference_feature_space)
         # create an empty matrix and get all ids
         reference_ids = self.prepared_df_ref["id"].values
-        all_ids = self.prepared_df["id"].values
+        formatted_ids = self.prepared_df["id"].values
         header = 'id,' + ",".join(reference_ids)
 
-        self.progress = tqdm(total=len(all_ids)*len(reference_ids), desc="Calculating distance matrix")
+        self.progress = tqdm(total=len(formatted_ids)*len(reference_ids), desc="Calculating distance matrix")
         # loop over all objects and calculate the distance to the reference objects
-        for id1 in all_ids:
+        for id1 in formatted_ids:
             self._update_matrix(id1, reference_ids, ref=True)
             
             # save the matrix to a file if the interval is reached
             if isinstance(dist_matrix_path, str) and self.matrix.ndim > 1 and self.matrix.shape[0] % save_interval == 0:
-                utils.save_matrix(self.matrix, dist_matrix_path, header, index=all_ids)
+                utils.save_matrix(self.matrix, dist_matrix_path, header, index=formatted_ids)
         self.progress.close()
 
         # make sure the full matrix is saved, or just return the matrix
         if isinstance(dist_matrix_path, str):
-            utils.save_matrix(self.matrix, dist_matrix_path, header, index=all_ids)
+            utils.save_matrix(self.matrix, dist_matrix_path, header, index=formatted_ids)
             print(f'Distance matrix calculated and saved to "{dist_matrix_path}"')
         else:
             print("Distance matrix calculated")    
@@ -200,29 +200,29 @@ class similarity:
             self.prepared_df = self._prepare_data(self.feature_space_file)
 
         # get all ids
-        all_ids = self.prepared_df["id"].values
-        header = 'id,' + ",".join(all_ids)
+        formatted_ids = self.prepared_df["id"].values
+        header = 'id,' + ",".join(formatted_ids)
 
         # calculate the distance between all objects
-        total_jobs = int(len(all_ids) * (len(all_ids) - 1) / 2)
+        total_jobs = int(len(formatted_ids) * (len(formatted_ids) - 1) / 2)
         self.progress = tqdm(total=total_jobs, desc="Calculating distance matrix")
-        for i, id1 in enumerate(all_ids):
-            self._update_matrix(id1, all_ids[i+1:], ref=False, n_zero_distances=i+1)
+        for i, id1 in enumerate(formatted_ids):
+            self._update_matrix(id1, formatted_ids[i+1:], ref=False, n_zero_distances=i+1)
 
             # save the matrix to a file if the interval is reached
             if isinstance(dist_matrix_path, str) and self.matrix.ndim > 1 and self.matrix.shape[0] % save_interval == 0:
-                mirrored_matrix = utils.save_matrix(self.matrix, dist_matrix_path, header, index=all_ids[:i+1])
+                mirrored_matrix = utils.save_matrix(self.matrix, dist_matrix_path, header, index=formatted_ids[:i+1])
                 #TODO: just append the new rows to the file instead of saving the whole matrix
         self.progress.close()
         
         # make sure the full matrix is saved
-        mirrored_matrix = utils.save_matrix(self.matrix, dist_matrix_path, header, index=all_ids)
+        mirrored_matrix = utils.save_matrix(self.matrix, dist_matrix_path, header, index=formatted_ids)
         print(f'INFO: Regular distance matrix calculated and saved to "{dist_matrix_path}"')
         
         if plot_matrix:
-            utils.plot_matrix(mirrored_matrix, all_ids)
+            utils.plot_matrix(mirrored_matrix, formatted_ids)
 
-        return mirrored_matrix, all_ids
+        return mirrored_matrix, formatted_ids
 
     def db_scan(self, eps=0.5, min_samples=5):
         if hasattr(self, 'prepared_df') == False:
