@@ -1,8 +1,11 @@
 import sys
 import os
+import dotenv
 
 module_dir = os.path.dirname(os.path.realpath(__file__)) # add the path of the module so it can be found
 sys.path.append(module_dir)
+
+dotenv.load_dotenv() # load the api key for the bag for the .env file
 
 from collection import collection
 from processing import processing
@@ -26,18 +29,9 @@ class BuildingSimilarity():
                 categorical_columns: list = None,
                 column_weights: dict = None,
                 columns: list = None,
+                neighborhood_id: str = None,
                 verbose: bool = False):
-        formatted_ids = self.format_ids(all_ids)
-        self.collection = collection(bag_data_folder, formatted_ids, verbose)
-        self.processing = processing(feature_space_file, bag_data_folder, formatted_ids, categorical_columns, verbose)
+        self.collection = collection(bag_data_folder, all_ids, neighborhood_id, verbose)
+        self.processing = processing(feature_space_file, bag_data_folder, self.collection.formatted_ids, categorical_columns, verbose)
         self.similarity = similarity(feature_space_file, column_weights, columns)
 
-    def format_ids(self, all_ids):
-        formatted_ids = []
-        for id in all_ids:        
-            if id.startswith("NL.IMBAG.Pand."): # remove the prefix if it is there
-                id = id[14:]
-            if '-' in id: # remove the suffix if it is there
-                id = id.split('-')[0]
-            formatted_ids.append(id)
-        return formatted_ids

@@ -1,14 +1,12 @@
 import json
 import os
 import asyncio
-import dotenv
 from tqdm import tqdm
 import aiohttp
 import random
 
-dotenv.load_dotenv() # load the api key for the bag for the .env file
-
 from collection.WFS_roof import roofmetrics
+from collection.hoodcollector import hoodcollector
 
 class collection():
     """
@@ -16,17 +14,32 @@ class collection():
     and it request it from the 3D-BAG, then it saves the data in cityjson format to the bag_data folder.
     """
 
-    def __init__(self, bag_data_folder: str, all_ids: list, verbose: bool = False):
+    def __init__(self, bag_data_folder: str, all_ids: list = None, neighborhood_id: str = None,  verbose: bool = False):
         self._bag_data_folder = bag_data_folder
-        self.all_ids = all_ids
         self._verbose = verbose # TODO: integrate this in the request function
         self.key = self._get_key()
+        self.formatted_ids = self.format_ids(all_ids, neighborhood_id)
 
     def _get_key(self):
         key = os.environ.get('BAG_API_KEY') #TODO: make sure this is an option
         if key is None:
             raise ValueError("WARNING: the BAG_API_KEY is None. Make sure you include BAG_API_KEY in the .env file in the root folder")
         return key
+    
+    def format_ids(self, all_ids=None, neighborhood_id=None):
+        if all_ids is None and neighborhood_id is None:
+            raise ValueError("Either all_ids or neighborhood_id should be provided to the BuildingSimilarity class.")
+        if neighborhood_id is not None:
+            all_ids = asyncio.run(hoodcollector(neighborhood_id, verbose=self._verbose))
+
+        formatted_ids = []
+        for id in all_ids:        
+            if id.startswith("NL.IMBAG.Pand."): # remove the prefix if it is there
+                id = id[14:]
+            if '-' in id: # remove the suffix if it is there
+                id = id.split('-')[0]
+            formatted_ids.append(id)
+        return formatted_ids
 
     def _convert_to_cityjson(self, data: dict, bag_attributes: dict, roof_attributes: dict, id: str):
         """Converts the data (that is collected with the API request) to CityJSON format."""
@@ -122,7 +135,7 @@ class collection():
         """Sets the request_ids attribute to a list of ids that are not already saved on the machine."""
         self.request_ids = []
         existing_files = 0
-        for id in self.all_ids:
+        for id in self.formatted_ids:
 
             if force_new == False and os.path.exists(f"{self._bag_data_folder}/{id}.city.json"):
                 existing_files += 1
@@ -130,10 +143,10 @@ class collection():
                 self.request_ids.append(id)
 
         # check how many requests are needed
-        if existing_files == len(self.all_ids):
+        if existing_files == len(self.formatted_ids):
             print("All the requested data is already saved on the machine, no new requests are needed.")
         elif existing_files > 0:
-            print(f"{existing_files} out of {len(self.all_ids)} files already exist, so {len(self.all_ids) - existing_files} more request(s) are needed.")
+            print(f"{existing_files} out of {len(self.formatted_ids)} files already exist, so {len(self.formatted_ids) - existing_files} more request(s) are needed.")
 
     async def _async_collect_building(self, id):
         async with self.semaphore:
