@@ -73,7 +73,6 @@ class processing():
             self._merge_files()
 
         # calculate the 2d / 3d metrics and turning function features
-        # TODO: create a single progress bar
         self.feature_space = self._create_feature_space()
         if self._categorical_columns is not None: # if there are categorical columns, convert them to dummies (one hot encoding)
             self.feature_space = pd.get_dummies(self.feature_space, columns=self._categorical_columns, dtype=int)
