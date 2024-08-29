@@ -3,7 +3,7 @@ import numpy as np
 
 from tqdm import tqdm
 from sklearn.metrics.pairwise import euclidean_distances
-from sklearn.cluster import DBSCAN
+from sklearn.cluster import DBSCAN, KMeans
 
 from similarity_calculation import utils
 
@@ -224,7 +224,7 @@ class similarity:
 
         return mirrored_matrix, formatted_ids
 
-    def db_scan(self, eps=0.5, min_samples=5):
+    def get_X(self):
         if hasattr(self, 'prepared_df') == False:
             self.prepared_df = self._prepare_data(self.feature_space_file)
         X = self.prepared_df.copy()
@@ -233,8 +233,19 @@ class similarity:
         X.dropna(axis='rows', inplace=True)
         ids = X['id']
         X.drop('id', axis=1, inplace=True)
+        return X, ids
+
+    def db_scan(self, eps=0.5, min_samples=5):
+        X, ids = self.get_X()
 
         # perform the dbscan algorithm and add the cluster labels / identification to the dataframe
         db = DBSCAN(eps=eps, min_samples=min_samples, n_jobs=-1).fit(X)
         results = pd.DataFrame({'id': ids, 'cluster': db.labels_})
         return results
+
+    def k_means(self, k=5):
+        X, ids = self.get_X()
+
+        km = KMeans(n_clusters=k, random_state=12).fit(X)
+        results = pd.DataFrame({'id': ids, 'cluster': km.labels_})
+        return results, km
