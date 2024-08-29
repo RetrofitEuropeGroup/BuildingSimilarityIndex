@@ -69,17 +69,17 @@ def get_errors_from_report(report, objid, cm):
                 return False
     return False
 
-def check_suitability(df):
+def check_suitability(df, all_ids):
     ## filter based on some conditions
     # filter out the buldings with actual_volume lower than 40, no holes
     # and actual volume larger than convex hull volume
+    perc_convex = sum(df['actual_volume'] >= df['convex_hull_volume']) / len(all_ids)
+    perc_vol40 = sum(df['actual_volume'] < 40) / len(all_ids)
+    perc_holes = sum(df['hole_count'] > 0) / len(all_ids)
     clean = df[(df['actual_volume'] < df['convex_hull_volume']) & (df['actual_volume'] >= 40) & (df['hole_count'] == 0)]
-    perc_convex = len(df.query('actual_volume > convex_hull_volume')) / len(df)
-    perc_vol40 = len(df.query('actual_volume < 40')) / len(df)
-    perc_holes = len(df.query('hole_count > 0')) / len(df)
     return clean, perc_convex, perc_vol40, perc_holes
 
-def check_metric_values(clean, df):
+def check_metric_values(clean, df, all_ids):
     """filters out the buildings with index values out of the range (0-1.2)"""
     # start with determining which indices are 2d and 3d
     indices_2d = [col for col in df.columns if col.endswith("_2d")] + ["horizontal_elongation"]
@@ -95,28 +95,35 @@ def check_metric_values(clean, df):
         clean = clean[(clean[ind] >= min_value) & (clean[ind] <= max_value)]
     for ind in indices_3d:
         clean = clean[(clean[ind] >= min_value) & (clean[ind] <= max_value)]
-    outfiltered_metrics = (before - len(clean)) / len(df)
+    outfiltered_metrics = (before - len(clean)) / len(all_ids)
     return clean, outfiltered_metrics   
 
-def clean_df(df, verbose=True):
+def clean_df(df, all_ids, val3dity_errors, verbose=True):
     """Cleans the dataframe, it removes the buildings with errors,
     holes, and buildings with index values out of the normal range."""
     # check the suitability of the buildings based on 3 conditions
-    clean, perc_convex, perc_vol40, perc_holes = check_suitability(df)
+    
+    
+    perc_bag_errors = 1 - (len(df)+val3dity_errors) / len(all_ids)
+    lost_perc = f"""\t{perc_bag_errors:.2%} \t of the buildings had issues with the BAG data, meaning that they were not found in the BAG or had an error
+        {val3dity_errors/len(all_ids):.2%} \t of the buildings had issues with their 3d shape (val3dity report)"""
+    
+    clean, perc_convex, perc_vol40, perc_holes = check_suitability(df, all_ids)
     clean = clean.drop(columns=["hole_count", 'min_vertical_elongation', 'max_vertical_elongation'], axis=1)
     
-    clean, outfiltered_metrics = check_metric_values(clean, df)
+    clean, outfiltered_metrics = check_metric_values(clean, df, all_ids)
 
     # let the user know how many buildings have been filtered out
-    rows_lost_perc = 1 - len(clean) / len(df)
+    rows_lost_perc = 1 - len(clean) / len(all_ids)
     if verbose and rows_lost_perc == 0:
-        print("INFO: All buildings are suitable for processing. None have been filtered out.") #TODO: this is not true, as we filter out buildings with errors in the val3dity report
+        print("INFO: All buildings are suitable for processing. None have been filtered out.")
     elif verbose:
-        print(f"""INFO: {rows_lost_perc:.2%} of the buildings has been filtered out as it did not meet one of the requirements, note that buildings can be filtered out for multiple reasons and thus may count multiple times:
-        {perc_convex:.2%} \t has a actual_volume that is larger than convex_hull_volume
+        lost_perc += f"""\t{perc_convex:.2%} \t has a actual_volume that is larger than convex_hull_volume
         {perc_vol40:.2%} \t has an actual_volume smaller than 40
         {perc_holes:.2%} \t has a hole_count that is not zero
-        {outfiltered_metrics:.2%} \t has metrics values out of the normal range""")
+        {outfiltered_metrics:.2%} \t has metrics values out of the normal range"""
+        header = f"INFO: {rows_lost_perc:.2%} of the buildings has been filtered out as it did not meet one of the requirements, note that buildings can be filtered out for multiple reasons"
+        print(f"{header}\n{lost_perc}")
     return clean
 
 def eligible(cm, id, report):
@@ -365,15 +372,16 @@ def process_building(building,
 
 # Assume semantic surfaces
 def calculate_metrics(input,
-         output_path=None,
-         filter=None,
-         repair=False,
-         plot_buildings=False,
-         without_indices=False,
-         jobs=1,
-         density_2d=1.0,
-         density_3d=1.0,
-         verbose=False):
+                    all_ids,
+                    output_path=None,
+                    filter=None,
+                    repair=False,
+                    plot_buildings=False,
+                    without_indices=False,
+                    jobs=1,
+                    density_2d=1.0,
+                    density_3d=1.0,
+                    verbose=False):
     """Uses a cityjson file to calculate the 2d / 3d metrics for the buildings in the cityjson file"""
 
     with open(input, "r") as f:
@@ -381,6 +389,11 @@ def calculate_metrics(input,
 
         # create and open the report
         report = get_report(input)
+
+        val3dity_errors = 0
+        for building in report["features"]:
+            if building["validity"] == False:
+                val3dity_errors += 1
         
         if os.path.exists('val3dity.log'): # clean the mess
             os.remove('val3dity.log')
@@ -445,7 +458,7 @@ def calculate_metrics(input,
     df.index.name = "id"
 
     try:
-        clean = clean_df(df, verbose)
+        clean = clean_df(df, all_ids, val3dity_errors, verbose)
     except Exception as e:
         print(f"ERROR: Problem with cleaning the dataframe, using the original. Error message: {e}")
         clean = df

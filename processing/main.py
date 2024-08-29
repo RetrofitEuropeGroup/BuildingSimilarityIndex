@@ -51,7 +51,7 @@ class processing():
         n_processors = max(os.cpu_count() - 1, 1)
 
         # run the citystats script in which the metrics are calculated
-        feature_space_metrics = calculate_metrics(input=self._merged_file, jobs=n_processors, verbose=self._verbose)
+        feature_space_metrics = calculate_metrics(input=self._merged_file, jobs=n_processors, all_ids = self._all_ids, verbose=self._verbose)
 
         # execute the turning function
         feature_space_tf = perform_turning_function(feature_space_metrics, metric='l2')
