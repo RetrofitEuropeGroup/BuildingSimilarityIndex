@@ -446,6 +446,7 @@ def calculate_metrics(input,
             futures.append(future)
 
         # wait for the jobs to finish and add the results to the stats
+        
         with tqdm(total=total_jobs, desc="Calculating the 2D & 3D metrics") as progress:
             stats = {}
             for future in as_completed(futures):
@@ -475,6 +476,3 @@ def calculate_metrics(input,
     except Exception as e:
         print(f"ERROR: could not save the file. Error message: {e}")
     return clean
-
-if __name__ == "__main__":
-    df = calculate_metrics("data/bag_data_merged/merged_1.city.json", output_path="./data/gpkg/test.csv", jobs=4)
