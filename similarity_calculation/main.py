@@ -65,7 +65,7 @@ class similarity:
                 na_cols.append(column)
 
         for column in na_cols:
-            self.columns.remove(column)
+            self.columns.remove(column) # TODO: seems to run into an error, trying to remove Index if column_weights is not given
             if self.column_weights is not None:
                 del self.column_weights[column]
         
