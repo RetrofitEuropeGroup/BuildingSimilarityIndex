@@ -8,7 +8,7 @@ from sklearn.cluster import DBSCAN, KMeans
 from similarity_calculation import utils
 
 class similarity:
-    def __init__(self, feature_space_file: str, column_weights: dict = None, columns: list = None):
+    def __init__(self, feature_space_file: str, column_weights: dict = None, columns: list = None, verbose: bool = False):
         """
         Initializes the SimilarityCalculator object which can be used to calculate the distance between two objects in the feature space data.
         This can be done for two object (calculate_distance), between all objects in the feature space data (distance_matrix) or the distance
@@ -18,13 +18,15 @@ class similarity:
             feature_space_file (str): The file path to the csv file with the feature space data.
             column_weights (dict, optional): A dictionary specifying the weights for the distance calculation of each column. Defaults to None.
             columns (list, optional): A list of column names to consider for the distance calculation, if used all columns bear the same weight. Defaults to None.
+            verbose (bool, optional): If True, print additional information. Defaults to False.
         """
-        # needed to know which columns are relevant for the distance calculation, and if the columns should be weighted
+        self.verbose = verbose
+        self.feature_space_file = feature_space_file
+        
+        # these are needed as we want to know which columns are relevant for the distance calculation, and if the columns should be weighted
         self._validate_input(column_weights, columns)
         self.column_weights = column_weights
-        self.columns = columns
-
-        self.feature_space_file = feature_space_file
+        self._set_columns(columns)
     
     ## helper functions for __init__
     def _validate_input(self, column_weights, columns):
@@ -51,8 +53,8 @@ class similarity:
             df_ref = pd.read_csv(feature_space_ref_file)
             ref_ids = df_ref['id']
             df = pd.concat([df, df_ref])
-        if self.columns is None:
-            self._set_columns(df.columns)
+        # if self.columns is None:
+        #     self._set_columns(df.columns)
 
         # removing the columns from self.columns if they are not in the df
         na_cols = []
@@ -68,7 +70,8 @@ class similarity:
             self.columns.remove(column) # TODO: seems to run into an error, trying to remove Index if column_weights is not given
             if self.column_weights is not None:
                 del self.column_weights[column]
-        
+
+        df = df[['id'] + self.columns]
         normalized_df = self._normalize(df)
 
         # weighted columns only if needed (if column_weights is given)
@@ -76,7 +79,7 @@ class similarity:
             prepared_df = self._weighted_columns(normalized_df)
         else:
             prepared_df = normalized_df
-        
+
         if feature_space_ref_file is not None:
             prepared_df_ref = prepared_df[prepared_df['id'].isin(ref_ids)]
             prepared_df = prepared_df[~prepared_df['id'].isin(ref_ids)]
@@ -233,6 +236,8 @@ class similarity:
         X.dropna(axis='rows', inplace=True)
         ids = X['id']
         X.drop('id', axis=1, inplace=True)
+        if self.verbose and len(self.prepared_df) > len(X):
+            print(f"INFO: Removed {len(self.prepared_df) - len(X)} rows with NaN values. Cannot compare / cluster buildings with NaN values")
         return X, ids
 
     def db_scan(self, eps=0.5, min_samples=5):
