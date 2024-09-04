@@ -4,6 +4,7 @@ import asyncio
 from tqdm import tqdm
 import aiohttp
 import random
+import time
 
 from collection.WFS_roof import roofmetrics
 from collection.hoodcollector import hoodcollector
@@ -43,21 +44,18 @@ class collection():
 
     def _convert_to_cityjson(self, data: dict, bag_attributes: dict, roof_attributes: dict, id: str):
         """Converts the data (that is collected with the API request) to CityJSON format."""
+        # create the cityjson object
         cityjson = data['metadata']
-        cityjsonfeature = data['feature']
-        cityjson['CityObjects'] = cityjsonfeature['CityObjects']
-        cityjson['vertices'] = cityjsonfeature['vertices']
+        cityjson['CityObjects'] = data['feature']['CityObjects']
+        cityjson['vertices'] = data['feature']['vertices']
 
-        bag_id = f"NL.IMBAG.Pand.{id}"
-        cityjson['CityObjects'][bag_id]['attributes']['totaal_oppervlakte'] = bag_attributes.get("totaal_oppervlakte")
-        cityjson['CityObjects'][bag_id]['attributes']['aantal_verblijfsobjecten'] = bag_attributes.get("aantal_verblijfsobjecten")
-        cityjson['CityObjects'][bag_id]['attributes']['gebruiksdoelen'] = bag_attributes.get("gebruiksdoelen")
-        cityjson['CityObjects'][bag_id]['attributes']['main_roof_parts'] = roof_attributes.get("main_roof_parts")
-        cityjson['CityObjects'][bag_id]['attributes']['main_roof_area'] = roof_attributes.get("main_roof_area")
-        cityjson['CityObjects'][bag_id]['attributes']['other_roof_parts'] = roof_attributes.get("other_roof_parts")
-        cityjson['CityObjects'][bag_id]['attributes']['other_roof_area'] = roof_attributes.get("other_roof_area")
-        cityjson['CityObjects'][bag_id]['attributes']['part_ratio'] = roof_attributes.get("part_ratio")
-        cityjson['CityObjects'][bag_id]['attributes']['area_ratio'] = roof_attributes.get("area_ratio")
+        # add the attributes to the cityjson object
+        all_variables = ['totaal_oppervlakte', 'aantal_verblijfsobjecten', 'gebruiksdoelen', 'main_roof_parts', 'main_roof_area', 'other_roof_parts', 'other_roof_area', 'part_ratio', 'area_ratio']
+        attributes = {**bag_attributes, **roof_attributes}
+        for var in all_variables:
+            if attributes.get(var) is None:
+                raise ValueError(f"Could not find the attribute {var} for building {id}")
+            cityjson['CityObjects'][f"NL.IMBAG.Pand.{id}"]['attributes'][var] = attributes.get(var)
         return cityjson
 
     def _make_url(self, id: str):
@@ -80,6 +78,8 @@ class collection():
         # get the adressen and their info
         adressen = result.get('_embedded', {}).get('adressen')
         if adressen is None:
+            # with open('errors.csv', 'a') as file:
+            #     file.write(f"adressen,{id},429\n")
             raise ValueError(f"Could not find adressen in the bag for building {id}")
         
         # loop over the adresses to get the relevant information
@@ -99,21 +99,33 @@ class collection():
         attributes = {'totaal_oppervlakte': total_oppervlakte, 'aantal_verblijfsobjecten': len(adressen), 'gebruiksdoelen': gebruiksdoelen} 
         return attributes
 
-    async def _get_additional_bag_attributes(self, id: str, session):
-        await asyncio.sleep(min(random.normalvariate(0.5), 0.1)) # to avoid the rate limit, the 3d_bag call takes way longer anyway
+    async def _get_additional_bag_attributes(self, id: str, session, retries=0):
+        await asyncio.sleep(min(random.normalvariate(0.5), 0.1)) # to avoid the rate limit, this does not affect speed as the 3d_bag call takes way longer anyway
         
         headers = {'X-Api-Key':self.key, 'Accept-Crs': 'EPSG:28992'}
         url = 'https://api.bag.kadaster.nl/lvbag/individuelebevragingen/v2/adressenuitgebreid'
 
         params = {'pandIdentificatie':id}
         r = await session.get(url, params=params, headers=headers)
+        # if r.status != 200 and retries == 0:
+        #     with open('errors.csv', 'a') as file:
+        #         file.write(f"regular,{id},{r.status}\n")
+        if r.status == 429 and retries < 1:
+            await asyncio.sleep(2)
+            return await self._get_additional_bag_attributes(id, session, retries+1)
         r.raise_for_status()
         bag_result = await r.json()
         return self._process_bag_result(bag_result, id)
 
-    async def _get_3d_bag(self, id: str, session):
+    async def _get_3d_bag(self, id: str, session, retries=0):
         url = self._make_url(id)
         r = await session.get(url)
+        if r.status != 200 and retries == 0:
+            with open('errors.csv', 'a') as file:
+                file.write(f"3d,{id},{r.status}\n")
+        if r.status == 429 and retries < 1:
+            await asyncio.sleep(2) # to avoid the rate limit
+            return await self._get_3d_bag(id, session, retries+1)
         r.raise_for_status()
         r = await r.json()
         return r
@@ -146,7 +158,8 @@ class collection():
             print(f"{existing_files} out of {len(self.formatted_ids)} files already exist, so {len(self.formatted_ids) - existing_files} more request(s) are needed.")
 
     async def _async_collect_building(self, id):
-        async with self.semaphore:
+        start_time = time.time()
+        async with self.semaphore: # used to limit the amount of requests at the same time
             try:
                 async with aiohttp.ClientSession() as session:
                     tasks = [self._get_3d_bag(id, session), self._get_additional_bag_attributes(id, session)]
@@ -161,6 +174,9 @@ class collection():
                     print(f"  Request for {id} failed: {e}")
                 self.errors += 1
             self.bar.update(1)
+        if time.time() - start_time < 1:
+            print(f"Sleeping for {1 - (time.time() - start_time)} seconds")
+            await asyncio.sleep(1 - (time.time() - start_time))
 
     async def async_request_data(self):
         self.errors = 0
