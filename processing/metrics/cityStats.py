@@ -73,10 +73,10 @@ def check_suitability(df, formatted_ids):
     ## filter based on some conditions
     # filter out the buldings with actual_volume lower than 40, no holes
     # and actual volume larger than convex hull volume
-    perc_convex = sum(df['actual_volume'] >= df['convex_hull_volume']) / len(formatted_ids)
+    perc_convex = sum(df['actual_volume'] > df['convex_hull_volume']) / len(formatted_ids)
     perc_vol40 = sum(df['actual_volume'] < 40) / len(formatted_ids)
     perc_holes = sum(df['hole_count'] > 0) / len(formatted_ids)
-    clean = df[(df['actual_volume'] < df['convex_hull_volume']) & (df['actual_volume'] >= 40) & (df['hole_count'] == 0)]
+    clean = df[(df['actual_volume'] <= df['convex_hull_volume']) & (df['actual_volume'] >= 40) & (df['hole_count'] == 0)]
     return clean, perc_convex, perc_vol40, perc_holes
 
 def check_metric_values(clean, df, formatted_ids):
@@ -285,7 +285,6 @@ def process_building(building,
         shape = cityjson.to_shapely(geom, vertices)
     else:
         shape = cityjson.to_shapely(geom, vertices, ground_only=False)
-
 
     obb_2d = cityjson.to_shapely(geom, vertices, ground_only=False).minimum_rotated_rectangle
 
