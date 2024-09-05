@@ -139,8 +139,6 @@ def eligible(cm, id, report):
 
     # check if there are any errors with the building in the val3dity report
     errors = get_errors_from_report(report, id, cm)
-    if cm['CityObjects'][parent_id]['attributes']['aantal_verblijfsobjecten'] is None:
-        return False
     if errors:
         return False
     else:
@@ -159,25 +157,22 @@ def get_parent_attributes(cm, obj):
 def get_report(input):
     # create the val3dity report with the same name as the input file
     val3dity_report = f"{input[:-5]}_report.json"
+    
+    # TODO: try to get this from the api call
+    try:
+        # determine the location of the val3dity executable
+        file_dir = os.path.dirname(os.path.realpath(__file__))
+        val3dity_cmd_location = os.path.join(file_dir, 'val3dity/val3dity')
 
-    if os.path.exists(val3dity_report):
+        # TODO: make this subprocess again so that the output is not printed
+        command = f'""{val3dity_cmd_location}" "{input}" -r "{val3dity_report}""'
+        os.system(command)
+        # subprocess.check_output(f'{val3dity_cmd_location} {input.name} -r {val3dity_report}')
         with open(val3dity_report, "rb") as f:
             report = json.load(f)
-    else:
-        try:
-            # determine the location of the val3dity executable
-            file_dir = os.path.dirname(os.path.realpath(__file__))
-            val3dity_cmd_location = os.path.join(file_dir, 'val3dity/val3dity')
-
-            # TODO: make this subprocess again so that the output is not printed
-            command = f'""{val3dity_cmd_location}" "{input}" -r "{val3dity_report}""'
-            os.system(command)
-            # subprocess.check_output(f'{val3dity_cmd_location} {input.name} -r {val3dity_report}')
-            with open(val3dity_report, "rb") as f:
-                report = json.load(f)
-        except Exception as e:
-            report = {}
-            print(f"Warning: Could not run val3dity, continuing without report. Message: {e}")
+    except Exception as e:
+        report = {}
+        print(f"Warning: Could not run val3dity, continuing without report. Message: {e}")
     return report
 
 class StatValuesBuilder:
@@ -200,10 +195,6 @@ class StatValuesBuilder:
             self.__values[index_name] = "NC"
 
 def add_purpose_of_use(values, actual_use, id, verbose=False):
-    # TODO: make sure we delete the building is there is no actual_use / woonlaag & integrate it in clean_df
-    if len(actual_use) == 0 and verbose:
-        print(f'WARNING: No actual_use (gebruiksdoelen) found for building {id}')
-
     possible_uses = ['woonfunctie', 'bijeenkomstfunctie', 'celfunctie', 'gezondheidszorgfunctie', 'industriefunctie', 
     'kantoorfunctie', 'logiesfunctie', 'onderwijsfunctie', 'sportfunctie', 'winkelfunctie',
     'overige gebruiksfunctie']
@@ -215,9 +206,7 @@ def add_purpose_of_use(values, actual_use, id, verbose=False):
             values[use] = 1
         else:
             values[use] = 0
-    
-    if None in actual_use:
-        print(f'WARNING: found {actual_use} as actual_use for building {id}')
+
     if len(actual_use) > 0 and uses_found != len(actual_use) and actual_use[0] != [None]:
         print(f'WARNING: Found {uses_found} uses, but expected {len(actual_use)}. actual_use: {actual_use}')
     return values    
