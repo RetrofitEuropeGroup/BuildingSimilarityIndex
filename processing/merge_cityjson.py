@@ -47,16 +47,7 @@ class MergeCityJSON:
 
     def create_output_name(self):
         self.prepare_output_folder()
-
-        # create a name for the merged file
-        file_name = 'merged.city.json'
-        while file_name in os.listdir(self.output_folder):
-            if file_name == 'merged.city.json': # merged.city.json already exists, try one with a version number
-                version_num = 0
-            else:
-                version_num = int(file_name.split('_')[1].split('.')[0])
-            file_name = f"merged_{version_num + 1}.city.json"
-        self.file_name = file_name
+        self.file_name = 'merged.city.json'
 
     def save(self):
         self.file_path = f"{self.output_folder}/{self.file_name}"
