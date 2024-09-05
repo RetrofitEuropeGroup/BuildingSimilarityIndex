@@ -8,7 +8,7 @@ from sklearn.cluster import DBSCAN, KMeans
 from similarity_calculation import utils
 
 class similarity:
-    def __init__(self, feature_space_file: str, column_weights: dict = None, columns: list = None, verbose: bool = False):
+    def __init__(self, feature_space_file: str, column_weights: dict = None, columns: list = None, normalize_columns: list = None, verbose: bool = False):
         """
         Initializes the SimilarityCalculator object which can be used to calculate the distance between two objects in the feature space data.
         This can be done for two object (calculate_distance), between all objects in the feature space data (distance_matrix) or the distance
@@ -18,15 +18,18 @@ class similarity:
             feature_space_file (str): The file path to the csv file with the feature space data.
             column_weights (dict, optional): A dictionary specifying the weights for the distance calculation of each column. Defaults to None.
             columns (list, optional): A list of column names to consider for the distance calculation, if used all columns bear the same weight. Defaults to None.
+            normalize_columns (list, optional): A list of column names that should be normalized (standard scaler). Defaults to None.
             verbose (bool, optional): If True, print additional information. Defaults to False.
         """
         self.verbose = verbose
         self.feature_space_file = feature_space_file
+        self.normalize_columns = normalize_columns
         
         # these are needed as we want to know which columns are relevant for the distance calculation, and if the columns should be weighted
         self._validate_input(column_weights, columns)
         self.column_weights = column_weights
         self._set_columns(columns)
+        
     
     ## helper functions for __init__
     def _validate_input(self, column_weights, columns):
@@ -72,7 +75,11 @@ class similarity:
                 del self.column_weights[column]
 
         df = df[['id'] + self.columns]
-        normalized_df = self._normalize(df)
+
+        if self.normalize_columns is not None:
+            normalized_df = self._normalize(df)
+        else:
+            normalized_df = df
 
         # weighted columns only if needed (if column_weights is given)
         if self.column_weights is not None:
@@ -91,7 +98,7 @@ class similarity:
         """normalize the columns in the geopandas dataframe so that every feature has the same weight in the distance calculation"""
         prepared_df = df.copy()
         
-        for column in self.columns:
+        for column in self.normalize_columns:
             if df[column].dtype != "float64":
                 prepared_df[column] = prepared_df[column].astype(float)
             try:

@@ -16,7 +16,10 @@ class BuildingSimilarity():
     Args:
         feature_space_file (str): The path to the output file (must be a .csv) where the processed data (=feature space) will be saved.
         bag_data_folder (str, optional): The path to the folder containing cityjson with a single building, source is from the BAG. Defaults to None.
-        categorical_columns (list, optional): A list of column names that are categorical, these columns will get distance 1/num_categories if they are not equal and 0 if they are. Defaults to None.
+        all_ids (list, optional): A list of all building ids (BAG ids) that should be considered. Defaults to None.
+        neighborhood_id (str, optional): The id of the neighborhood (from the BAG) that should be considered. Defaults to None.
+        normalize_columns (list, optional): A list of column names that should be normalized (standard scaler). Defaults to None.
+        categorical_columns (list, optional): A list of column names that are categorical, these columns will be converted with one-hot encoding. Defaults to None.
         column_weights (dict, optional): A dictionary specifying the weights for the distance calculation of each column. Defaults to None.
         columns (list, optional): A list of column names to consider for the distance calculation, if used all columns bear the same weight. Defaults to None.
         verbose (bool, optional): If True, the progress will be printed. Defaults to False.
@@ -26,11 +29,12 @@ class BuildingSimilarity():
                 feature_space_file: str="data/feature_space/feature_space.csv",
                 bag_data_folder: str = 'data/bag_data',
                 all_ids: list = None,
+                neighborhood_id: str = None,
                 categorical_columns: list = None,
+                normalize_columns: list = None,
                 column_weights: dict = None,
                 columns: list = None,
-                neighborhood_id: str = None,
                 verbose: bool = False):
         self.collection = collection(bag_data_folder, all_ids, neighborhood_id, verbose)
         self.processing = processing(feature_space_file, bag_data_folder, self.collection.formatted_ids, categorical_columns, verbose)
-        self.similarity = similarity(feature_space_file, column_weights, columns, verbose)
+        self.similarity = similarity(feature_space_file, column_weights, columns, normalize_columns, verbose)
