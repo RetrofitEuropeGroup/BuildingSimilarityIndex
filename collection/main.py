@@ -53,9 +53,10 @@ class collection():
         all_variables = ['totaal_oppervlakte', 'aantal_verblijfsobjecten', 'gebruiksdoelen', 'main_roof_parts', 'main_roof_area', 'other_roof_parts', 'other_roof_area', 'part_ratio', 'area_ratio']
         attributes = {**bag_attributes, **roof_attributes}
         for var in all_variables:
-            if attributes.get(var) is None:
-                raise ValueError(f"Could not find the attribute {var} for building {id}")
-            cityjson['CityObjects'][f"NL.IMBAG.Pand.{id}"]['attributes'][var] = attributes.get(var)
+            if var == 'gebruiksdoelen':
+                cityjson['CityObjects'][f"NL.IMBAG.Pand.{id}"]['attributes'][var] = attributes.get(var, [])
+            else:
+                cityjson['CityObjects'][f"NL.IMBAG.Pand.{id}"]['attributes'][var] = attributes.get(var)
         return cityjson
 
     def _make_url(self, id: str):
@@ -78,9 +79,9 @@ class collection():
         # get the adressen and their info
         adressen = result.get('_embedded', {}).get('adressen')
         if adressen is None:
-            # with open('errors.csv', 'a') as file:
-            #     file.write(f"adressen,{id},429\n")
-            raise ValueError(f"Could not find adressen in the bag for building {id}")
+            with open('errors.csv', 'a') as file:
+                file.write(f"adressen,{id},429\n")
+            return {}
         
         # loop over the adresses to get the relevant information
         total_oppervlakte = 0
@@ -107,9 +108,9 @@ class collection():
 
         params = {'pandIdentificatie':id}
         r = await session.get(url, params=params, headers=headers)
-        # if r.status != 200 and retries == 0:
-        #     with open('errors.csv', 'a') as file:
-        #         file.write(f"regular,{id},{r.status}\n")
+        if r.status != 200 and retries == 0:
+            with open('errors.csv', 'a') as file:
+                file.write(f"regular,{id},{r.status}\n")
         if r.status == 429 and retries < 1:
             await asyncio.sleep(2)
             return await self._get_additional_bag_attributes(id, session, retries+1)
