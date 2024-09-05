@@ -33,5 +33,4 @@ class BuildingSimilarity():
                 verbose: bool = False):
         self.collection = collection(bag_data_folder, all_ids, neighborhood_id, verbose)
         self.processing = processing(feature_space_file, bag_data_folder, self.collection.formatted_ids, categorical_columns, verbose)
-        self.similarity = similarity(feature_space_file, column_weights, columns)
-
+        self.similarity = similarity(feature_space_file, column_weights, columns, verbose)
