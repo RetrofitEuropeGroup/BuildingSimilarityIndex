@@ -110,12 +110,6 @@ class similarity:
     ## main functions
     # function to calculate the distance between two objects
     def _check_ids(self, id1, id2):
-        # check if the ids are in the correct format
-        if not id1.startswith("NL.IMBAG.Pand."):
-            id1 = f"NL.IMBAG.Pand.{id1}-0"
-        if not id2.startswith("NL.IMBAG.Pand."):
-            id2 = f"NL.IMBAG.Pand.{id2}-0"
-
         # check if the ids are in the dataframe
         if id1 not in self.prepared_df["id"].values:
             raise ValueError(f"id1 {id1} not found in the dataframe")
@@ -193,7 +187,7 @@ class similarity:
             utils.save_matrix(self.matrix, dist_matrix_path, header, index=formatted_ids)
             print(f'Distance matrix calculated and saved to "{dist_matrix_path}"')
         else:
-            print("Distance matrix calculated")    
+            print("Distance matrix calculated")
         return self.matrix
 
     def distance_matrix_regular(self, dist_matrix_path: str, save_interval: int = 100, plot_matrix: bool = False):

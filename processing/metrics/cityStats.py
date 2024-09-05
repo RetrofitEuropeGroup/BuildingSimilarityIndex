@@ -452,6 +452,7 @@ def calculate_metrics(input,
                 # retrieve the result
                 obj, vals = future.result()
                 if not vals is None:
+                    obj = obj.replace('NL.IMBAG.Pand.', '')
                     stats[obj] = vals
                 progress.update(1) # update the progress bar
 
