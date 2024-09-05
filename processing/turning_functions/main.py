@@ -8,6 +8,8 @@ import numpy as np
 from tqdm import tqdm
 from shapely.affinity import translate
 
+
+
 def save_pollist(pollist, file_path):
     """ Saves a list of polygons as geopackage format. Creates path if it does not exist."""
     path = os.path.dirname(file_path)
@@ -197,20 +199,21 @@ def rotate_until_corner(tf):
         c += 1
     return tf
 
+## COORDS 2 SHOULD BE FIXED, COORDS 1 SHOULD BE THE ROTATING AND MIRRORING ONE.
 def minimize_dist(coords1, coords2, metric='l1', norm=True, tot_length=False):
     """
     Minimizes the turning function distance between two turning functions by rotating mirroring one polygon.
     """
-    if len(coords1) <= len(coords2):
-        tf1 = get_turning(coords1, norm=norm, tot_length=tot_length)
-        tf2 = get_turning(coords2, norm=norm, tot_length=tot_length)
-        tf2_mirror = get_turning([(-1*i[0], -1*i[1]) for i in coords2], norm=norm, tot_length=tot_length)
-        turn_number = len(tf2[0])-1
-    else:
-        tf1 = get_turning(coords2, norm=norm, tot_length=tot_length)
-        tf2 = get_turning(coords1, norm=norm, tot_length=tot_length)
-        tf2_mirror = get_turning([(-1*i[0], -1*i[1]) for i in coords1], norm=norm, tot_length=tot_length)
-        turn_number = len(tf2[0])-1
+    # if len(coords1) <= len(coords2):
+    #     tf1 = get_turning(coords1, norm=norm, tot_length=tot_length)
+    #     tf2 = get_turning(coords2, norm=norm, tot_length=tot_length)
+    #     tf2_mirror = get_turning([(-1*i[0], -1*i[1]) for i in coords2], norm=norm, tot_length=tot_length)
+    #     turn_number = len(tf2[0])-1
+    # else:
+    tf1 = get_turning(coords2, norm=norm, tot_length=tot_length)
+    tf2 = get_turning(coords1, norm=norm, tot_length=tot_length)
+    tf2_mirror = get_turning([(-1*i[0], -1*i[1]) for i in coords1], norm=norm, tot_length=tot_length)
+    turn_number = len(tf2[0])-1
     tf1 = rotate_until_corner(tf1)
     d1 = dist_coords2(tf1, tf2, metric=metric)
     d2 = dist_coords2(tf1, tf2_mirror, metric=metric)
