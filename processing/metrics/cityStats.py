@@ -194,20 +194,20 @@ class StatValuesBuilder:
         else:
             self.__values[index_name] = "NC"
 
-def add_purpose_of_use(values, actual_use, id, verbose=False):
+def add_purpose_of_use(values, actual_use):
     possible_uses = ['woonfunctie', 'bijeenkomstfunctie', 'celfunctie', 'gezondheidszorgfunctie', 'industriefunctie', 
     'kantoorfunctie', 'logiesfunctie', 'onderwijsfunctie', 'sportfunctie', 'winkelfunctie',
     'overige gebruiksfunctie']
     uses_found = 0
     # add the possible uses to the dict to make it a seperate column
     for use in possible_uses:
-        if use in actual_use:
+        if actual_use is not None and use in actual_use: # if actual_use is None, just put 0 for every use
             uses_found += 1
             values[use] = 1
         else:
             values[use] = 0
 
-    if len(actual_use) > 0 and uses_found != len(actual_use) and actual_use[0] != [None]:
+    if actual_use is not None and uses_found != len(actual_use):
         print(f'WARNING: Found {uses_found} uses, but expected {len(actual_use)}. actual_use: {actual_use}')
     return values    
 
@@ -315,8 +315,10 @@ def process_building(building,
         "hole_count": tri_mesh.n_open_edges,
         "geometry": shape,
     }
-    purposes = building['attributes'].get("gebruiksdoelen", [])
-    values = add_purpose_of_use(values, np.unique(purposes), obj, verbose)
+    purposes = building['attributes'].get("gebruiksdoelen")
+    if purposes is not None:
+        purposes = np.unique(purposes)
+    values = add_purpose_of_use(values, purposes)
 
     voxel = pv.voxelize(tri_mesh, density=density_3d, check_surface=False)
     grid = voxel.cell_centers().points
