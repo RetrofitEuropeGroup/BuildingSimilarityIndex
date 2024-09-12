@@ -243,8 +243,14 @@ class similarity:
             if self.verbose and len(self.prepared_df) > len(X):
                 print(f"INFO: Removed {len(self.prepared_df) - len(X)} rows with NaN values. Cannot compare / cluster buildings with NaN values")
         elif na_mode == 'mean':
+            na_values, na_columns = 0, []
             for column in self.columns:
-                X.fillna(X[column].mean(), inplace=True)
+                if X[column].isna().sum()>0:
+                    na_values += X[column].isna().sum()
+                    na_columns.append(column)
+                    X.fillna(X[column].mean(), inplace=True)
+            if self.verbose and len(na_columns) > 0:
+                print(f"INFO: Filled {na_values} NaN values with the mean. Columns with missing values are: {', '.join(na_columns)}")
 
         # get the ids so they can be used later, then drop them from the dataframe as we don't want to cluster on them
         ids = X['id']
