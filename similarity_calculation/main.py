@@ -230,7 +230,7 @@ class similarity:
     def get_X(self, na_mode='mean'):
         """Get the feature space data as a pandas dataframe. The data is prepared if needed. Then N/A values are handled 
         in two ways: na_mode == mean imputes the mean of the column, na_mode == drop drops the row with the N/A value"""
-        if na_mode not in ['mean', 'drop']:
+        if na_mode not in ['mean', 'drop', 'zero']:
             raise ValueError("na_mode must be either 'mean' or 'drop'")
         if hasattr(self, 'prepared_df') == False:
             self.prepared_df = self._prepare_data(self.feature_space_file)
@@ -242,31 +242,36 @@ class similarity:
             # logging if needed
             if self.verbose and len(self.prepared_df) > len(X):
                 print(f"INFO: Removed {len(self.prepared_df) - len(X)} rows with NaN values. Cannot compare / cluster buildings with NaN values")
-        elif na_mode == 'mean':
+        elif na_mode in ['mean', 'zero']:
             na_values, na_columns = 0, []
             for column in self.columns:
                 if X[column].isna().sum()>0:
                     na_values += X[column].isna().sum()
                     na_columns.append(column)
-                    X.fillna(X[column].mean(), inplace=True)
-            if self.verbose and len(na_columns) > 0:
+                    if na_mode == 'mean':
+                        X.fillna(X[column].mean(), inplace=True)
+                    elif na_mode == 'zero':
+                        X.fillna(0, inplace=True)
+            if self.verbose and len(na_columns) > 0 and na_mode == 'mean':
                 print(f"INFO: Filled {na_values} NaN values with the mean. Columns with missing values are: {', '.join(na_columns)}")
+            elif self.verbose and len(na_columns) > 0 and na_mode == 'zero':
+                print(f"INFO: Filled {na_values} NaN values with zero. Columns with missing values are: {', '.join(na_columns)}")
 
         # get the ids so they can be used later, then drop them from the dataframe as we don't want to cluster on them
         ids = X['id']
         X.drop('id', axis=1, inplace=True)
         return X, ids
 
-    def db_scan(self, eps=0.5, min_samples=5):
-        X, ids = self.get_X(na_mode='mean')
+    def db_scan(self, eps=0.5, min_samples=5, na_mode='mean'):
+        X, ids = self.get_X(na_mode)
 
         # perform the dbscan algorithm and add the cluster labels / identification to the dataframe
         db = DBSCAN(eps=eps, min_samples=min_samples, n_jobs=-1).fit(X)
         results = pd.DataFrame({'id': ids, 'cluster': db.labels_})
         return results
 
-    def k_means(self, k=5):
-        X, ids = self.get_X(na_mode='mean')
+    def k_means(self, k=5, na_mode='mean'):
+        X, ids = self.get_X(na_mode)
 
         km = KMeans(n_clusters=k, random_state=12).fit(X)
         results = pd.DataFrame({'id': ids, 'cluster': km.labels_})
