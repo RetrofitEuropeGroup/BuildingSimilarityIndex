@@ -98,13 +98,12 @@ class similarity:
         """normalize the columns in the geopandas dataframe so that every feature has the same weight in the distance calculation"""
         prepared_df = df.copy()
         
-        for column in self.normalize_columns:
+        for column in self.columns:
             if df[column].dtype != "float64":
                 prepared_df[column] = prepared_df[column].astype(float)
-            try:
+            
+            if column in self.normalize_columns:
                 prepared_df[column] = (prepared_df[column] - prepared_df[column].mean()) / prepared_df[column].std()
-            except Exception as e:
-                raise ValueError(f"Could not normalize column: {column}. Error: {e}")
         return prepared_df
     
     def _weighted_columns(self, df):
