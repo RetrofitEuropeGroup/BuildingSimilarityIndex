@@ -8,7 +8,7 @@ from sklearn.cluster import DBSCAN, KMeans
 from similarity_calculation import utils
 
 class similarity:
-    def __init__(self, feature_space_file: str, column_weights: dict = None, columns: list = None, verbose: bool = False):
+    def __init__(self, feature_space_file: str, column_weights: dict = None, columns: list = None, normalize_columns: list = None, verbose: bool = False):
         """
         Initializes the SimilarityCalculator object which can be used to calculate the distance between two objects in the feature space data.
         This can be done for two object (calculate_distance), between all objects in the feature space data (distance_matrix) or the distance
@@ -18,15 +18,18 @@ class similarity:
             feature_space_file (str): The file path to the csv file with the feature space data.
             column_weights (dict, optional): A dictionary specifying the weights for the distance calculation of each column. Defaults to None.
             columns (list, optional): A list of column names to consider for the distance calculation, if used all columns bear the same weight. Defaults to None.
+            normalize_columns (list, optional): A list of column names that should be normalized (standard scaler). Defaults to None.
             verbose (bool, optional): If True, print additional information. Defaults to False.
         """
         self.verbose = verbose
         self.feature_space_file = feature_space_file
+        self.normalize_columns = normalize_columns
         
         # these are needed as we want to know which columns are relevant for the distance calculation, and if the columns should be weighted
         self._validate_input(column_weights, columns)
         self.column_weights = column_weights
         self._set_columns(columns)
+        
     
     ## helper functions for __init__
     def _validate_input(self, column_weights, columns):
@@ -72,7 +75,11 @@ class similarity:
                 del self.column_weights[column]
 
         df = df[['id'] + self.columns]
-        normalized_df = self._normalize(df)
+
+        if self.normalize_columns is not None:
+            normalized_df = self._normalize(df)
+        else:
+            normalized_df = df
 
         # weighted columns only if needed (if column_weights is given)
         if self.column_weights is not None:
@@ -94,10 +101,9 @@ class similarity:
         for column in self.columns:
             if df[column].dtype != "float64":
                 prepared_df[column] = prepared_df[column].astype(float)
-            try:
+            
+            if column in self.normalize_columns:
                 prepared_df[column] = (prepared_df[column] - prepared_df[column].mean()) / prepared_df[column].std()
-            except Exception as e:
-                raise ValueError(f"Could not normalize column: {column}. Error: {e}")
         return prepared_df
     
     def _weighted_columns(self, df):
@@ -221,29 +227,51 @@ class similarity:
 
         return mirrored_matrix, formatted_ids
 
-    def get_X(self):
+    def get_X(self, na_mode='mean'):
+        """Get the feature space data as a pandas dataframe. The data is prepared if needed. Then N/A values are handled 
+        in two ways: na_mode == mean imputes the mean of the column, na_mode == drop drops the row with the N/A value"""
+        if na_mode not in ['mean', 'drop', 'zero']:
+            raise ValueError("na_mode must be either 'mean' or 'drop'")
         if hasattr(self, 'prepared_df') == False:
             self.prepared_df = self._prepare_data(self.feature_space_file)
         X = self.prepared_df.copy()
 
         # drop rows with NaN values and save the ids as they are not relevant for the clustering
-        X.dropna(axis='rows', inplace=True)
+        if na_mode == 'drop':
+            X.dropna(axis='rows', inplace=True)
+            # logging if needed
+            if self.verbose and len(self.prepared_df) > len(X):
+                print(f"INFO: Removed {len(self.prepared_df) - len(X)} rows with NaN values. Cannot compare / cluster buildings with NaN values")
+        elif na_mode in ['mean', 'zero']:
+            na_values, na_columns = 0, []
+            for column in self.columns:
+                if X[column].isna().sum()>0:
+                    na_values += X[column].isna().sum()
+                    na_columns.append(column)
+                    if na_mode == 'mean':
+                        X.fillna(X[column].mean(), inplace=True)
+                    elif na_mode == 'zero':
+                        X.fillna(0, inplace=True)
+            if self.verbose and len(na_columns) > 0 and na_mode == 'mean':
+                print(f"INFO: Filled {na_values} NaN values with the mean. Columns with missing values are: {', '.join(na_columns)}")
+            elif self.verbose and len(na_columns) > 0 and na_mode == 'zero':
+                print(f"INFO: Filled {na_values} NaN values with zero. Columns with missing values are: {', '.join(na_columns)}")
+
+        # get the ids so they can be used later, then drop them from the dataframe as we don't want to cluster on them
         ids = X['id']
         X.drop('id', axis=1, inplace=True)
-        if self.verbose and len(self.prepared_df) > len(X):
-            print(f"INFO: Removed {len(self.prepared_df) - len(X)} rows with NaN values. Cannot compare / cluster buildings with NaN values")
         return X, ids
 
-    def db_scan(self, eps=0.5, min_samples=5):
-        X, ids = self.get_X()
+    def db_scan(self, eps=0.5, min_samples=5, na_mode='mean'):
+        X, ids = self.get_X(na_mode)
 
         # perform the dbscan algorithm and add the cluster labels / identification to the dataframe
         db = DBSCAN(eps=eps, min_samples=min_samples, n_jobs=-1).fit(X)
         results = pd.DataFrame({'id': ids, 'cluster': db.labels_})
         return results
 
-    def k_means(self, k=5):
-        X, ids = self.get_X()
+    def k_means(self, k=5, na_mode='mean'):
+        X, ids = self.get_X(na_mode)
 
         km = KMeans(n_clusters=k, random_state=12).fit(X)
         results = pd.DataFrame({'id': ids, 'cluster': km.labels_})

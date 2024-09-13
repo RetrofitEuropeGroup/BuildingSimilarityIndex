@@ -1,0 +1,17 @@
+column_names
+actual_volume
+convex_hull_volume
+oorspronkelijkbouwjaar
+b3_opp_buitenmuur
+b3_opp_dak_plat
+b3_opp_dak_schuin
+b3_opp_grond
+b3_opp_scheidingsmuur
+aantal_verblijfsobjecten
+totaal_oppervlakte
+main_roof_parts
+main_roof_area
+other_roof_parts
+other_roof_area
+part_ratio
+area_ratio
