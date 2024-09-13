@@ -212,8 +212,9 @@ def minimize_dist(coords1, coords2, metric='l1', norm=True, tot_length=False):
     # else:
     tf1 = get_turning(coords2, norm=norm, tot_length=tot_length)
     tf2 = get_turning(coords1, norm=norm, tot_length=tot_length)
-    tf2_mirror = get_turning([(-1*i[0], -1*i[1]) for i in coords1], norm=norm, tot_length=tot_length)
+    tf2_mirror = get_turning([(-1*i[0], i[1]) for i in coords1], norm=norm, tot_length=tot_length)
     turn_number = len(tf2[0])-1
+    tf2 = rotate_until_corner(tf2)
     tf1 = rotate_until_corner(tf1)
     d1 = dist_coords2(tf1, tf2, metric=metric)
     d2 = dist_coords2(tf1, tf2_mirror, metric=metric)
@@ -270,6 +271,24 @@ def round_polygon(pol, decimals=1, simplify_tolerance=0.2):
     yy = np.round(yy.tolist(), decimals)
     return shapely.geometry.Polygon(zip(xx, yy))
 
+def remove_straight_vertices(pol, tolerance=5):
+    """ Removes vertices located along a straight edge, defined by an angle of 180 +/- 5 degrees."""
+    xx, yy = pol.exterior.coords.xy
+    nr_coords = len(xx)
+    xx_new = []
+    yy_new = []
+    angles = []
+    for i in range(nr_coords):
+        p2 = np.array([xx[i], yy[i]])
+        p1 = np.array([xx[i-1], yy[i-1]]) - p2
+        p3 = np.array([xx[(i+1)%nr_coords], yy[(i+1)%nr_coords]]) - p2
+        if not(np.array_equal(p1, p3)):
+            angle = 360*np.arccos(np.dot(p1, p3)/(np.sqrt(np.dot(p1, p1))*np.sqrt(np.dot(p3, p3))))/(2*np.pi)
+            if not((180-tolerance) < angle and angle < (180 + tolerance)):
+                xx_new += [xx[i]]
+                yy_new += [yy[i]]
+    return shapely.geometry.Polygon(zip(xx_new, yy_new))
+
 
 def perform_turning_function(df, 
                         reference_shapes_path=None,
@@ -291,7 +310,7 @@ def perform_turning_function(df,
     pols = list(df[geometry_column])
     if type(pols[0]) == shapely.geometry.MultiPolygon:
         pols = [list(i.geoms)[0] for i in pols]
-    pols = [round_polygon(translate_pol(i)) for i in pols]
+    pols = [remove_straight_vertices(round_polygon(translate_pol(i))) for i in pols]
 
     # TODO: we could speed this up through parallelization
     # create the feature space based on the turning function and save it to a dataframe
