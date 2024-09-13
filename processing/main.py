@@ -54,7 +54,7 @@ class processing():
         feature_space_metrics = calculate_metrics(input=self._merged_file, jobs=n_processors, formatted_ids = self._formatted_ids, verbose=self._verbose)
 
         # execute the turning function
-        feature_space_tf = perform_turning_function(feature_space_metrics, metric='l2')
+        feature_space_tf = perform_turning_function(feature_space_metrics, metric='l1')
 
         # merge the results in one data frame & return the df
         feature_space_merged = feature_space_metrics.merge(feature_space_tf, on='id')
