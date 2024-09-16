@@ -3,7 +3,7 @@ import numpy as np
 
 from tqdm import tqdm
 from sklearn.metrics.pairwise import euclidean_distances
-from sklearn.cluster import DBSCAN, KMeans
+from sklearn.cluster import DBSCAN, HDBSCAN, KMeans
 
 from similarity_calculation import utils
 
@@ -267,6 +267,14 @@ class similarity:
 
         # perform the dbscan algorithm and add the cluster labels / identification to the dataframe
         db = DBSCAN(eps=eps, min_samples=min_samples, n_jobs=-1).fit(X)
+        results = pd.DataFrame({'id': ids, 'cluster': db.labels_})
+        return results
+
+    def hdb_scan(self, min_cluster_size=5, na_mode='mean'):
+        X, ids = self.get_X(na_mode)
+
+        # perform the dbscan algorithm and add the cluster labels / identification to the dataframe
+        db = HDBSCAN(min_cluster_size=min_cluster_size, n_jobs=-1).fit(X)
         results = pd.DataFrame({'id': ids, 'cluster': db.labels_})
         return results
 
