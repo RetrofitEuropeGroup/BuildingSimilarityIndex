@@ -76,8 +76,8 @@ class collection():
         # get the adressen and their info
         adressen = result.get('_embedded', {}).get('adressen')
         if adressen is None:
-            with open('errors.csv', 'a') as file:
-                file.write(f"adressen,{id},429\n")
+            # with open('errors.csv', 'a') as file:
+            #     file.write(f"adressen,{id},429\n")
             return {}
         
         # loop over the adresses to get the relevant information
@@ -106,8 +106,8 @@ class collection():
         params = {'pandIdentificatie':id}
         r = await session.get(url, params=params, headers=headers)
         if r.status != 200 and retries == 0:
-            with open('errors.csv', 'a') as file:
-                file.write(f"regular,{id},{r.status}\n")
+            # with open('errors.csv', 'a') as file:
+            #     file.write(f"regular,{id},{r.status}\n")
         if r.status == 429 and retries < 1:
             await asyncio.sleep(2)
             return await self._get_additional_bag_attributes(id, session, retries+1)
@@ -119,8 +119,8 @@ class collection():
         url = self._make_url(id)
         r = await session.get(url)
         if r.status != 200 and retries == 0:
-            with open('errors.csv', 'a') as file:
-                file.write(f"3d,{id},{r.status}\n")
+            # with open('errors.csv', 'a') as file:
+            #     file.write(f"3d,{id},{r.status}\n")
         if r.status == 429 and retries < 1:
             await asyncio.sleep(2) # to avoid the rate limit
             return await self._get_3d_bag(id, session, retries+1)
