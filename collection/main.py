@@ -105,7 +105,7 @@ class collection():
 
         params = {'pandIdentificatie':id}
         r = await session.get(url, params=params, headers=headers)
-        if r.status != 200 and retries == 0:
+        # if r.status != 200 and retries == 0:
             # with open('errors.csv', 'a') as file:
             #     file.write(f"regular,{id},{r.status}\n")
         if r.status == 429 and retries < 1:
@@ -118,7 +118,7 @@ class collection():
     async def _get_3d_bag(self, id: str, session, retries=0):
         url = self._make_url(id)
         r = await session.get(url)
-        if r.status != 200 and retries == 0:
+        # if r.status != 200 and retries == 0:
             # with open('errors.csv', 'a') as file:
             #     file.write(f"3d,{id},{r.status}\n")
         if r.status == 429 and retries < 1:
