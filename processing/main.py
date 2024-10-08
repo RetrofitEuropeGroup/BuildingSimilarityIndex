@@ -69,8 +69,7 @@ class processing():
         # merge if a folder has been provided
         if len(os.listdir(self._bag_data_folder)) == 0:
             raise Exception("The bag_data_folder is empty, please provide a folder with cityjson files")
-        if self._bag_data_folder is not None:
-            self._merge_files()
+        self._merge_files()
 
         # calculate the 2d / 3d metrics and turning function features
         self.feature_space = self._create_feature_space()
