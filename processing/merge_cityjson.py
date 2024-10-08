@@ -32,8 +32,9 @@ class MergeCityJSON:
             if 'merged' in file:
                 continue
             elif file.endswith('city.json') and (self.formatted_ids is None or file.split('.')[0] in self.formatted_ids):
-                cm = CityJSON(open(f"{self.input_folder}/{file}", 'r'))
-                all_objects.append(cm)
+                    with open(f"{self.input_folder}/{file}", 'r') as f:
+                        cm = CityJSON(f)
+                    all_objects.append(cm)
         self.all_objects = all_objects
 
     def prepare_output_folder(self):
