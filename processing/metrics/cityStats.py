@@ -408,7 +408,8 @@ def calculate_metrics(input,
 
 
     num_cores = jobs
-    print(f'Using {num_cores} core(s) to process {total_jobs} building(s)')
+    if verbose:
+        print(f'Using {num_cores} core(s) to process {total_jobs} building(s)')
     with ProcessPoolExecutor(max_workers=num_cores) as pool:
         # add the jobs to the pool
         futures = []
