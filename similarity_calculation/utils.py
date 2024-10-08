@@ -32,6 +32,8 @@ def save_matrix(matrix, path, header, index):
     
     # check if the path is in an existing directory
     parent_dir = os.path.dirname(path)
+    if parent_dir == '':
+        parent_dir = '.'
     if os.path.isdir(parent_dir) == False:
         os.mkdir(parent_dir)
 
