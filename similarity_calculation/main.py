@@ -41,16 +41,16 @@ class similarity:
     def _set_columns(self, columns=None):
         if self.column_weights is not None:  # overwrite columns if column_weights is given
             self.columns = list(self.column_weights.keys())
-        elif columns is not None and 'id' in columns:  # if columns is given, remove the id column
-            self.columns = columns.drop("id")
-        elif columns is not None:
-            self.columns = columns
-        
-        if self.columns is None: # if columns is still None, raise an error
-            raise ValueError("Columns must be given if column_weights is not given")
+        elif columns is not None:  # if columns is given, remove the id column
+            self.columns = columns            
+        else:
+            self.columns = pd.read_csv(self.feature_space_file, dtype={'id': str}).columns.tolist() # TODO: load the fs in init and use it here
+
+        if "id" in self.columns: # ID can never be used for distance calculation
+            self.columns.remove("id")
 
     # functions to prepare the data for the distance calculation
-    def _prepare_data(self, feature_space_file, feature_space_ref_file = None):
+    def _prepare_data(self, feature_space_file, feature_space_ref_file = None): # TODO: is this the right way to handle the reference file?
         df = pd.read_csv(feature_space_file, dtype={'id': str})
         if feature_space_ref_file is not None:
             df_ref = pd.read_csv(feature_space_ref_file)
