@@ -51,7 +51,7 @@ class similarity:
 
     # functions to prepare the data for the distance calculation
     def _prepare_data(self, feature_space_file, feature_space_ref_file = None):
-        df = pd.read_csv(feature_space_file)
+        df = pd.read_csv(feature_space_file, dtype={'id': str})
         if feature_space_ref_file is not None:
             df_ref = pd.read_csv(feature_space_ref_file)
             ref_ids = df_ref['id']
@@ -117,44 +117,44 @@ class similarity:
     # function to calculate the distance between two objects
     def _check_ids(self, id1, id2):
         # check if the ids are in the dataframe
-        if id1 not in self.prepared_df["id"].values:
+        if id1 not in self.ids.values:
             raise ValueError(f"id1 {id1} not found in the dataframe")
 
         # consider the reference dataframe if it is given, don't look at the original geopandas dataframe
-        if hasattr(self, "prepared_df_ref") and id2 not in self.prepared_df_ref["id"].values:
-            raise ValueError(f"id2 {id2} not found in the reference geopandas dataframe")
-        if not hasattr(self, "prepared_df_ref") and id2 not in self.prepared_df["id"].values:
-            raise ValueError(f"id2 {id2} not found in the dataframe")
+        if id2 not in self.ids.values:
+            raise ValueError(f"id2 ({id2}) not found in the geopandas dataframe")
 
         # if all good, return the ids
         return id1, id2
 
-    def _update_matrix(self, id1, other_ids, ref, n_zero_distances=0):
+    def _update_matrix(self, id1, other_ids, n_zero_distances=0):
         # calculate the distance between the object and all other
         row = np.array([0] * n_zero_distances)
         for id2 in other_ids:
-            dist = self.calculate_distance(id1, id2, ref)
+            dist = self.calculate_distance(id1, id2)
             row = np.append(row, round(dist, 5))
-        self.progress.update(len(other_ids))
-        # update the matrix itself
+
+        # update the matrix itself, else statement is only for the first row
         if hasattr(self, 'matrix'):
             self.matrix = np.vstack((self.matrix, row))
         else:
             self.matrix = row
+        
+        self.progress.update(len(other_ids))
 
-    def calculate_distance(self, id1, id2, ref=False):
-        if hasattr(self, 'prepared_df') == False:
-            self.prepared_df = self._prepare_data(self.feature_space_file)
+    def calculate_distance(self, id1, id2):
+        if hasattr(self, 'X') == False:
+            raise ValueError("The feature space data has not been prepared yet. Please run the set_X() function first.")
         id1, id2 = self._check_ids(id1, id2)
 
         # for obj2 consider the reference geopandas dataframe if it is given, otherwise use the original geopandas dataframe
-        obj1 = self.prepared_df[self.prepared_df["id"] == id1]
-        if ref == False:
-            obj2 = self.prepared_df[self.prepared_df["id"] == id2]
-        else:
-            obj2 = self.prepared_df_ref[self.prepared_df_ref["id"] == id2]
+        obj1 = self.X.iloc[list(self.ids).index(id1)] # TODO: shouldn't we change self.ids to a list?
+        obj2 = self.X.iloc[list(self.ids).index(id2)]
+        obj1_fs = obj1[self.columns].array.reshape(1, -1)
+        obj2_fs = obj2[self.columns].array.reshape(1, -1)
+
         # calculate the euclidean distance between the two objects
-        dist = euclidean_distances(obj1[self.columns], obj2[self.columns])
+        dist = euclidean_distances(obj1_fs, obj2_fs)
         return dist[0][0]
 
     def calculate_similarity(self, id1, id2):
@@ -162,35 +162,37 @@ class similarity:
         return 1 / (1 + dist)
 
     def distance_matrix_reference(self,
-                                reference_feature_space: str,
+                                reference_ids: list,
                                 dist_matrix_path: str,
                                 save_interval: int = 100):
         """ a distance matrix, but the x-axis are reference objects and the y-axis 
         are the objects that are compared to the reference objects. The y-axis objects
         are from the original geopandas dataframe, the x-axis objects are from the
         reference geopandas dataframe."""
-        utils.check_csv(dist_matrix_path)
 
-        if hasattr(self, 'prepared_df') == False:
-            self.prepared_df, self.prepared_df_ref = self._prepare_data(self.feature_space_file, reference_feature_space)
-        # create an empty matrix and get all ids
-        reference_ids = self.prepared_df_ref["id"].values
-        formatted_ids = self.prepared_df["id"].values
+        utils.check_csv(dist_matrix_path) # check if the path is a csv file
+        
+        # get all ids & prepare the data
+        self.set_X()
+        reference_ids = utils.format_ids(reference_ids)
+        print(len(self.ids))
+        regular_ids = self.ids[~self.ids.isin(reference_ids)] # remove the reference ids from the regular ids
+        print(len(regular_ids))
         header = 'id,' + ",".join(reference_ids)
+        self.progress = tqdm(total=len(regular_ids)*len(reference_ids), desc="Calculating distance matrix")
 
-        self.progress = tqdm(total=len(formatted_ids)*len(reference_ids), desc="Calculating distance matrix")
         # loop over all objects and calculate the distance to the reference objects
-        for id1 in formatted_ids:
-            self._update_matrix(id1, reference_ids, ref=True)
+        for id1 in regular_ids:
+            self._update_matrix(id1, reference_ids)
             
             # save the matrix to a file if the interval is reached
             if isinstance(dist_matrix_path, str) and self.matrix.ndim > 1 and self.matrix.shape[0] % save_interval == 0:
-                utils.save_matrix(self.matrix, dist_matrix_path, header, index=formatted_ids)
+                utils.save_matrix(self.matrix, dist_matrix_path, header, index=regular_ids)
         self.progress.close()
 
         # make sure the full matrix is saved, or just return the matrix
         if isinstance(dist_matrix_path, str):
-            utils.save_matrix(self.matrix, dist_matrix_path, header, index=formatted_ids)
+            utils.save_matrix(self.matrix, dist_matrix_path, header, index=regular_ids)
             print(f'Distance matrix calculated and saved to "{dist_matrix_path}"')
         else:
             print("Distance matrix calculated")
@@ -199,37 +201,39 @@ class similarity:
     def distance_matrix_regular(self, dist_matrix_path: str, save_interval: int = 100, plot_matrix: bool = False):
         utils.check_csv(dist_matrix_path)
         
-        if hasattr(self, 'prepared_df') == False:
-            self.prepared_df = self._prepare_data(self.feature_space_file)
-
-        # get all ids
-        formatted_ids = self.prepared_df["id"].values
-        header = 'id,' + ",".join(formatted_ids)
+        # get all ids & prepare the data
+        self.set_X()
+        print(self.ids)
+        header = 'id,' + ",".join(self.ids)
 
         # calculate the distance between all objects
-        total_jobs = int(len(formatted_ids) * (len(formatted_ids) - 1) / 2)
+        total_jobs = int(len(self.ids) * (len(self.ids) - 1) / 2)
         self.progress = tqdm(total=total_jobs, desc="Calculating distance matrix")
-        for i, id1 in enumerate(formatted_ids):
-            self._update_matrix(id1, formatted_ids[i+1:], ref=False, n_zero_distances=i+1)
+        for i, id1 in enumerate(self.ids):
+            self._update_matrix(id1, self.ids[i+1:], n_zero_distances=i+1)
 
             # save the matrix to a file if the interval is reached
             if isinstance(dist_matrix_path, str) and self.matrix.ndim > 1 and self.matrix.shape[0] % save_interval == 0:
-                mirrored_matrix = utils.save_matrix(self.matrix, dist_matrix_path, header, index=formatted_ids[:i+1])
+                mirrored_matrix = utils.save_matrix(self.matrix, dist_matrix_path, header, index=self.ids[:i+1])
                 #TODO: just append the new rows to the file instead of saving the whole matrix
         self.progress.close()
         
         # make sure the full matrix is saved
-        mirrored_matrix = utils.save_matrix(self.matrix, dist_matrix_path, header, index=formatted_ids)
+        mirrored_matrix = utils.save_matrix(self.matrix, dist_matrix_path, header, index=self.ids)
         print(f'INFO: Regular distance matrix calculated and saved to "{dist_matrix_path}"')
         
         if plot_matrix:
-            utils.plot_matrix(mirrored_matrix, formatted_ids)
+            utils.plot_matrix(mirrored_matrix, self.ids)
+        return mirrored_matrix, self.ids
 
-        return mirrored_matrix, formatted_ids
+    def set_X(self, na_mode='mean'):
+        """
+        Get the feature space data as a pandas dataframe. The data is prepared if needed. Then N/A values are handled in three ways:
+            mean - imputes the mean of the column
+            drop - drops the row with the N/A value
+            zero - fills the N/A value with zero
+        """
 
-    def get_X(self, na_mode='mean'):
-        """Get the feature space data as a pandas dataframe. The data is prepared if needed. Then N/A values are handled 
-        in two ways: na_mode == mean imputes the mean of the column, na_mode == drop drops the row with the N/A value"""
         if na_mode not in ['mean', 'drop', 'zero']:
             raise ValueError("na_mode must be either 'mean' or 'drop'")
         if hasattr(self, 'prepared_df') == False:
@@ -258,12 +262,13 @@ class similarity:
                 print(f"INFO: Filled {na_values} NaN values with zero. Columns with missing values are: {', '.join(na_columns)}")
 
         # get the ids so they can be used later, then drop them from the dataframe as we don't want to cluster on them
-        ids = X['id']
+        self.ids = X['id']
         X.drop('id', axis=1, inplace=True)
-        return X, ids
+        self.X = X
+        return self.X, self.ids
 
     def db_scan(self, eps=0.5, min_samples=5, na_mode='mean'):
-        X, ids = self.get_X(na_mode)
+        X, ids = self.set_X(na_mode)
 
         # perform the dbscan algorithm and add the cluster labels / identification to the dataframe
         db = DBSCAN(eps=eps, min_samples=min_samples, n_jobs=-1).fit(X)
@@ -271,7 +276,7 @@ class similarity:
         return results
 
     def hdb_scan(self, min_cluster_size=5, na_mode='mean'):
-        X, ids = self.get_X(na_mode)
+        X, ids = self.set_X(na_mode)
 
         # perform the dbscan algorithm and add the cluster labels / identification to the dataframe
         db = HDBSCAN(min_cluster_size=min_cluster_size, n_jobs=-1).fit(X)
@@ -279,7 +284,7 @@ class similarity:
         return results
 
     def k_means(self, k=5, na_mode='mean'):
-        X, ids = self.get_X(na_mode)
+        X, ids = self.set_X(na_mode)
 
         km = KMeans(n_clusters=k, random_state=12).fit(X)
         results = pd.DataFrame({'id': ids, 'cluster': km.labels_})
