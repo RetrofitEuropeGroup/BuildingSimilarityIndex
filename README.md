@@ -12,16 +12,18 @@
 </p>
 
 
-A Python library based on [3d-building-metrics repo](https://github.com/tudelft3d/3d-building-metrics) to create a pipeline for the comparison of buildings. The library automatically collects the data from the [3D-BAG](https://docs.3dbag.nl/en/) and compares building based on the results of a turning function and metrics from the 3d-building-metrics repo. It consists of three modules: collection, processing and similarity_calculation. The modules are combined in one large module: BuildingsSimilarity. 
+A Python library inspired by the [3d-building-metrics repo](https://github.com/tudelft3d/3d-building-metrics) designed to create a pipeline for assessing building similarity. This library automatically collects data from the [3D-BAG](https://docs.3dbag.nl/en/) and compares buildings using a turning function, metrics from the 3d-building-metrics repo, and public BAG data. It consists of three main modules: collection, processing, and similarity_calculation. These modules are integrated into a comprehensive module called BuildingsSimilarity.
 
-The <b>collection</b> module downloads cityjson from the 3D-BAG based on a list of [BAG IDs](https://www.geobasisregistraties.nl/basisregistraties/adressen-en-gebouwen). The <b>processing</b> module processes the buildings by merging the downloaded cityjson, calculating 2D/3D metrics, filtering out unsuitable buildings (based on abnormal metric values) and a turning function. Its output is a geopackage with the BAG IDs and the metrics. Finally the calculates the <b>similarity_calculation</b> module calculates the distance between buildings. This can be the distance between two individual buildings or multiple buildings at once.
+- The **collection** module downloads CityJSON files from the 3D-BAG based on a list of [BAG IDs](https://www.geobasisregistraties.nl/basisregistraties/adressen-en-gebouwen) or a [neighborhood ID](https://catalogus.kadaster.nl/brt/en/page/Buurt?clang=nl).
+- The **processing** module merges the downloaded CityJSON files, calculates 2D/3D metrics, filters out unsuitable buildings (based on abnormal metric values), and applies a turning function. The output is a Pandas Dataframe containing the BAG IDs and the calculated metrics.
+- The **similarity_calculation** module preprocesses the data for similarity calcuation by scaling, normalizing, handeling N/A values and selecting relevant columns. The most basic form of similarity_calculation is to calculate the distance between two individual buildings. More advanced options are to calculate a (reference) distance matrix or to run ML-algorithms such as DBSCAN or K-Means
 
 ## Prerequisites
 
-- python >=3.10
+- python==3.11
 
 ## Usage
-All modules can be used individually but are combined in BuildingSimilarity. Go to the demo directory for an idea of how to use the module.
+All modules can be used individually but are combined in BuildingSimilarity. Go to the demo directory for an example of how to use the module.
 
 ## Installation
 
@@ -40,6 +42,13 @@ pip install -r requirements.txt
 3. Unzip val3dity-win64-v240
 4. Unzip val3dity-win64
 5. Copy all the files from the unzipped directory <i>val3dity-win64</i> to this specific place in the repo: <i>processing/metrics/val3dity</i>
+6. Provide the `BAG_API_KEY` as an environmental variable. You can do this by creating a `.env` file in the root directory of the project and adding the following line:
+
+```
+BAG_API_KEY=your_api_key_here
+```
+
+Make sure to replace `your_api_key_here` with your actual BAG API key.
 
 
 ### Linux (Ubuntu 22.04)
@@ -70,6 +79,16 @@ cp val3dity/build/val3dity FF_BuildingSimilarityIndex/processing/metrics/val3dit
 cd FF_BuildingSimilarityIndex
 pip install -r requirements.txt
 ```
+
+
+4. Provide the `BAG_API_KEY` as an environmental variable. You can do this by creating a `.env` file in the root directory of the project and adding the following line:
+
+```
+BAG_API_KEY=your_api_key_here
+```
+
+Make sure to replace `your_api_key_here` with your actual BAG API key.
+
 
 
 ## Show your support
