@@ -43,7 +43,6 @@ class MergeCityJSON:
         
         # make sure the output folder exists
         if os.path.exists(self.output_folder) == False:
-            print(os.listdir())
             os.mkdir(self.output_folder)
 
     def save(self):
