@@ -21,6 +21,7 @@ A Python library inspired by the [3d-building-metrics repo](https://github.com/t
 ## Prerequisites
 
 - python==3.11
+- A API key for the BAG. If you don't have one, you can [apply](https://www.kadaster.nl/zakelijk/producten/adressen-en-gebouwen/bag-api-individuele-bevragingen) for it free of charge
 
 ## Usage
 All modules can be used individually but are combined in BuildingSimilarity. Go to the demo directory for an example of how to use the module.
