@@ -59,8 +59,14 @@ async def roofmetrics(bagid=None, bbox=None, verbose=False, session=None):
     other_no_parts = len(data) - mr_no_parts
     other_area = data[~data['main_roof']]['geometry'].area.sum()
 
-    part_ratio = mr_no_parts / (mr_no_parts + other_no_parts)
-    area_ratio = mr_area / (mr_area + other_area)
+    if mr_no_parts + other_no_parts == 0:
+        part_ratio = None
+    else:
+        part_ratio = mr_no_parts / (mr_no_parts + other_no_parts)
+    if mr_area + other_area == 0:
+        area_ratio = None
+    else:
+        area_ratio = mr_area / (mr_area + other_area)
 
     if verbose:
         print(f'Building: {bagid}')
