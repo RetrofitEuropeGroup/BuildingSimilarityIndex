@@ -3,7 +3,6 @@ import json
 
 from cjio.cityjson import CityJSON
 
-
 class MergeCityJSON:
     """Class to merge multiple CityJSON files into a single CityJSON file. 
     Note that the input_folder must only contain files that are to be merged. 
@@ -28,15 +27,14 @@ class MergeCityJSON:
         self.merged_obj = self.all_objects[0].j # is the merged object in json format
 
     def load_objects(self):
-        all_objects = []
+        self.all_objects = []
         for file in os.listdir(self.input_folder):
             if 'merged' in file:
                 continue
             elif file.endswith('city.json') and (self.formatted_ids is None or file.split('.')[0] in self.formatted_ids):
                 with open(f"{self.input_folder}/{file}", 'r') as f:
                     cm = CityJSON(f)
-                all_objects.append(cm)
-        self.all_objects = all_objects
+                self.all_objects.append(cm)
 
     def prepare_output_folder(self):
         # set the output folder based on the input folder if not specified
@@ -45,6 +43,7 @@ class MergeCityJSON:
         
         # make sure the output folder exists
         if os.path.exists(self.output_folder) == False:
+            print(os.listdir())
             os.mkdir(self.output_folder)
 
     def save(self):
@@ -53,11 +52,11 @@ class MergeCityJSON:
             json.dump(self.merged_obj, f)
 
     def run(self):
+        self.prepare_output_folder()
+
         # load & merge
         self.load_objects()
         self.merge_objects()
-        
-        # save the merged object
-        self.prepare_output_folder()
-        self.save()
 
+        # save the merged object
+        self.save()
