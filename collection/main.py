@@ -17,12 +17,12 @@ class collection():
 
     def __init__(self, bag_data_folder: str, all_ids: list = None, neighborhood_id: str = None,  verbose: bool = False):
         self._bag_data_folder = bag_data_folder
-        self._verbose = verbose # TODO: integrate this in the request function
+        self._verbose = verbose
         self.key = self._get_key()
         self.formatted_ids = self.format_ids(all_ids, neighborhood_id)
 
     def _get_key(self):
-        key = os.environ.get('BAG_API_KEY') #TODO: make sure this is an option
+        key = os.environ.get('BAG_API_KEY')
         if key is None:
             raise ValueError("WARNING: the BAG_API_KEY is None. Make sure you include BAG_API_KEY in the .env file in the root folder")
         return key
