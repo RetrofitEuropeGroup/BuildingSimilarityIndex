@@ -43,3 +43,13 @@ def save_matrix(matrix, path, header, index):
 def check_csv(path):
     if isinstance(path, str) and path.endswith('.csv') == False:
         raise ValueError("the path must end with '.csv'")
+    
+def format_ids(all_ids):
+    formatted_ids = []
+    for id in all_ids:        
+        if id.startswith("NL.IMBAG.Pand."): # remove the prefix if it is there
+            id = id[14:]
+        if '-' in id: # remove the suffix if it is there
+            id = id.split('-')[0]
+        formatted_ids.append(id)
+    return formatted_ids
