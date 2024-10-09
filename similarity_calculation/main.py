@@ -164,24 +164,23 @@ class similarity:
     def distance_matrix_reference(self,
                                 reference_ids: list,
                                 dist_matrix_path: str,
-                                save_interval: int = 100):
+                                save_interval: int = 100,
+                                plot_matrix: bool = False):
         """ a distance matrix, but the x-axis are reference objects and the y-axis 
         are the objects that are compared to the reference objects. The y-axis objects
         are from the original geopandas dataframe, the x-axis objects are from the
         reference geopandas dataframe."""
 
         utils.check_csv(dist_matrix_path) # check if the path is a csv file
-        
+
         # get all ids & prepare the data
         self.set_X()
         reference_ids = utils.format_ids(reference_ids)
-        print(len(self.ids))
         regular_ids = self.ids[~self.ids.isin(reference_ids)] # remove the reference ids from the regular ids
-        print(len(regular_ids))
         header = 'id,' + ",".join(reference_ids)
-        self.progress = tqdm(total=len(regular_ids)*len(reference_ids), desc="Calculating distance matrix")
 
         # loop over all objects and calculate the distance to the reference objects
+        self.progress = tqdm(total=len(regular_ids)*len(reference_ids), desc="Calculating distance matrix")
         for id1 in regular_ids:
             self._update_matrix(id1, reference_ids)
             
@@ -196,6 +195,9 @@ class similarity:
             print(f'Distance matrix calculated and saved to "{dist_matrix_path}"')
         else:
             print("Distance matrix calculated")
+
+        if plot_matrix:
+            utils.plot_matrix(self.matrix, regular_ids, reference_ids)
         return self.matrix
 
     def distance_matrix_regular(self, dist_matrix_path: str, save_interval: int = 100, plot_matrix: bool = False):
@@ -246,7 +248,7 @@ class similarity:
             if self.verbose and len(self.prepared_df) > len(X):
                 print(f"INFO: Removed {len(self.prepared_df) - len(X)} rows with NaN values. Cannot compare / cluster buildings with NaN values")
         elif na_mode in ['mean', 'zero']:
-            na_values, na_columns = 0, []
+            na_values, na_columns = 0, [] # TODO: move this in a separate function
             for column in self.columns:
                 if X[column].isna().sum()>0:
                     na_values += X[column].isna().sum()

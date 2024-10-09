@@ -3,18 +3,21 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_matrix(matrix, formatted_ids):
-    if matrix.shape[0] != matrix.shape[1]:
-        raise ValueError("Matrix is not square, cannot plot")
-    if matrix.shape[0] != len(formatted_ids):
-        raise ValueError("Number of ids does not match the matrix dimensions")
-    if len(formatted_ids) > 50:
-        raise ValueError("Too many ids to plot, max 50 ids allowed")
+def plot_matrix(matrix, formatted_ids, reference_ids=None):
+    if matrix.shape[0] != matrix.shape[1] and reference_ids is None:
+        raise ValueError("Matrix is not square and is also not a reference matrix, cannot plot")
+    if len(formatted_ids) > 100 or (reference_ids is not None and len(reference_ids) > 100):
+        raise ValueError(f"Too many ids to plot, max 100 ids allowed: {len(formatted_ids)}, {len(reference_ids)}")
     
     plt.matplotlib.pyplot.matshow(matrix)
-    plt.xticks(range(len(formatted_ids)), formatted_ids, rotation=90)
+    if reference_ids is not None:
+        plt.xticks(range(len(reference_ids)), reference_ids, rotation=90)
+        plt.ylabel("Reference IDs")
+        plt.xlabel("Other IDs")
+    else:
+        plt.xticks(range(len(formatted_ids)), formatted_ids, rotation=90)
     plt.yticks(range(len(formatted_ids)), formatted_ids)
-    plt.colorbar()
+    plt.colorbar().set_label('Distance')
     plt.show()
 
 # function to calculate the distance matrix
