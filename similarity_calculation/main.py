@@ -203,7 +203,6 @@ class similarity:
         
         # get all ids & prepare the data
         self.set_X()
-        print(self.ids)
         header = 'id,' + ",".join(self.ids)
 
         # calculate the distance between all objects
@@ -224,7 +223,7 @@ class similarity:
         
         if plot_matrix:
             utils.plot_matrix(mirrored_matrix, self.ids)
-        return mirrored_matrix, self.ids
+        return mirrored_matrix
 
     def set_X(self, na_mode='mean'):
         """
