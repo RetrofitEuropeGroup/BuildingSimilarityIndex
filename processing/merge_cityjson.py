@@ -15,6 +15,7 @@ class MergeCityJSON:
         self.input_folder = input_folder
         self.output_folder = output_folder
         self.formatted_ids = formatted_ids
+        self.file_name = 'merged.city.json'
 
     def merge_objects(self):
         if len(self.all_objects) == 0:
@@ -32,9 +33,9 @@ class MergeCityJSON:
             if 'merged' in file:
                 continue
             elif file.endswith('city.json') and (self.formatted_ids is None or file.split('.')[0] in self.formatted_ids):
-                    with open(f"{self.input_folder}/{file}", 'r') as f:
-                        cm = CityJSON(f)
-                    all_objects.append(cm)
+                with open(f"{self.input_folder}/{file}", 'r') as f:
+                    cm = CityJSON(f)
+                all_objects.append(cm)
         self.all_objects = all_objects
 
     def prepare_output_folder(self):
@@ -45,10 +46,6 @@ class MergeCityJSON:
         # make sure the output folder exists
         if os.path.exists(self.output_folder) == False:
             os.mkdir(self.output_folder)
-
-    def create_output_name(self):
-        self.prepare_output_folder()
-        self.file_name = 'merged.city.json'
 
     def save(self):
         self.file_path = f"{self.output_folder}/{self.file_name}"
@@ -61,5 +58,6 @@ class MergeCityJSON:
         self.merge_objects()
         
         # save the merged object
-        self.create_output_name()
+        self.prepare_output_folder()
         self.save()
+
