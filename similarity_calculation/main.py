@@ -190,11 +190,9 @@ class similarity:
         self.progress.close()
 
         # make sure the full matrix is saved, or just return the matrix
-        if isinstance(dist_matrix_path, str):
-            utils.save_matrix(self.matrix, dist_matrix_path, header, index=regular_ids)
+        utils.save_matrix(self.matrix, dist_matrix_path, header, index=regular_ids)
+        if self.verbose:
             print(f'Distance matrix calculated and saved to "{dist_matrix_path}"')
-        else:
-            print("Distance matrix calculated")
 
         if plot_matrix:
             utils.plot_matrix(self.matrix, regular_ids, reference_ids)
@@ -221,11 +219,34 @@ class similarity:
         
         # make sure the full matrix is saved
         mirrored_matrix = utils.save_matrix(self.matrix, dist_matrix_path, header, index=self.ids)
-        print(f'INFO: Regular distance matrix calculated and saved to "{dist_matrix_path}"')
+        if self.verbose:
+            print(f'INFO: Regular distance matrix calculated and saved to "{dist_matrix_path}"')
         
         if plot_matrix:
             utils.plot_matrix(mirrored_matrix, self.ids)
         return mirrored_matrix
+
+    def handle_na(self, na_mode='mean'):
+        if na_mode == 'drop':
+            self.X.dropna(axis='rows', inplace=True)
+            # logging if needed
+            if self.verbose and len(self.prepared_df) > len(self.X):
+                print(f"INFO: Removed {len(self.prepared_df) - len(self.X)} rows with NaN values. Cannot compare / cluster buildings with NaN values")
+        elif na_mode in ['mean', 'zero']:
+            na_values, na_columns = 0, []
+            for column in self.columns:
+                if self.X[column].isna().sum()>0:
+                    na_values += self.X[column].isna().sum()
+                    na_columns.append(column)
+                    if na_mode == 'mean':
+                        self.X.fillna(self.X[column].mean(), inplace=True)
+                    elif na_mode == 'zero':
+                        self.X.fillna(0, inplace=True)
+            # logging if needed
+            if self.verbose and len(na_columns) > 0 and na_mode == 'mean':
+                print(f"INFO: Filled {na_values} NaN values with the mean. Columns with missing values are: {', '.join(na_columns)}")
+            elif self.verbose and len(na_columns) > 0 and na_mode == 'zero':
+                print(f"INFO: Filled {na_values} NaN values with zero. Columns with missing values are: {', '.join(na_columns)}")
 
     def set_X(self, na_mode='mean'):
         """
@@ -239,33 +260,15 @@ class similarity:
             raise ValueError("na_mode must be either 'mean' or 'drop'")
         if hasattr(self, 'prepared_df') == False:
             self.prepared_df = self._prepare_data(self.feature_space_file)
-        X = self.prepared_df.copy()
+        self.X = self.prepared_df.copy()
 
         # drop rows with NaN values and save the ids as they are not relevant for the clustering
-        if na_mode == 'drop':
-            X.dropna(axis='rows', inplace=True)
-            # logging if needed
-            if self.verbose and len(self.prepared_df) > len(X):
-                print(f"INFO: Removed {len(self.prepared_df) - len(X)} rows with NaN values. Cannot compare / cluster buildings with NaN values")
-        elif na_mode in ['mean', 'zero']:
-            na_values, na_columns = 0, [] # TODO: move this in a separate function
-            for column in self.columns:
-                if X[column].isna().sum()>0:
-                    na_values += X[column].isna().sum()
-                    na_columns.append(column)
-                    if na_mode == 'mean':
-                        X.fillna(X[column].mean(), inplace=True)
-                    elif na_mode == 'zero':
-                        X.fillna(0, inplace=True)
-            if self.verbose and len(na_columns) > 0 and na_mode == 'mean':
-                print(f"INFO: Filled {na_values} NaN values with the mean. Columns with missing values are: {', '.join(na_columns)}")
-            elif self.verbose and len(na_columns) > 0 and na_mode == 'zero':
-                print(f"INFO: Filled {na_values} NaN values with zero. Columns with missing values are: {', '.join(na_columns)}")
+        self.handle_na(na_mode)
 
         # get the ids so they can be used later, then drop them from the dataframe as we don't want to cluster on them
-        self.ids = X['id']
-        X.drop('id', axis=1, inplace=True)
-        self.X = X
+        self.ids = self.X['id']
+        self.X.drop('id', axis=1, inplace=True)
+        
         return self.X, self.ids
 
     def db_scan(self, eps=0.5, min_samples=5, na_mode='mean'):
