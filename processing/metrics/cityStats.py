@@ -183,7 +183,6 @@ def get_n_val3dity_errors(cm):
         if 'attributes' in building:
             if building['attributes']['b3_val3dity_lod22'] != '[]':
                 total += 1
-                print(f"Building {building['attributes']['identificatie']} has val3dity errors")
     return total
 
 def process_building(building,
