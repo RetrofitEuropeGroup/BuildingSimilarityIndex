@@ -164,6 +164,8 @@ class collection():
                     tasks = [self._get_3d_bag(id, session), self._get_additional_bag_attributes(id, session)]
                     bag3d_data, bag_attributes = await asyncio.gather(*tasks)
                     roof_attributes = await self._get_roof_attributes(id, bag3d_data, session)
+                if roof_attributes is None:
+                    return # if the roof attributes are not available, the building is not saved
                 cityjson = self._convert_to_cityjson(bag3d_data, bag_attributes, roof_attributes, id)
                 self._save(cityjson, id) # use request_ids to get the right id without the pre- and suffix
             except KeyboardInterrupt:
