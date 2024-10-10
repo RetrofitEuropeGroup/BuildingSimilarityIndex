@@ -4,11 +4,8 @@ data/*
 */data/*
 *input*
 *output*
-*/val3dity.log
-val3dity.log
 *.py~
 analysis/*
-processing/metrics/val3dity/*
 .env
 .idea
 # keep the folders that have a .gitkeep file, but ignore their contents
