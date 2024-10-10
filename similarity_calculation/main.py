@@ -24,6 +24,7 @@ class similarity:
         self.verbose = verbose
         self.feature_space_file = feature_space_file
         self.normalize_columns = normalize_columns
+        self.raw_df = pd.read_csv(self.feature_space_file, dtype={'id': str})
         
         # these are needed as we want to know which columns are relevant for the distance calculation, and if the columns should be weighted
         self._validate_input(column_weights, columns)
@@ -49,39 +50,38 @@ class similarity:
         if "id" in self.columns: # ID can never be used for distance calculation
             self.columns.remove("id")
 
-    # functions to prepare the data for the distance calculation
-    def _prepare_data(self, feature_space_file): # TODO: is this the right way to handle the reference file?
-        df = pd.read_csv(feature_space_file, dtype={'id': str})
+    def remove_na_column(self, column):
+        self.columns.remove(column)
+        if self.column_weights is not None:
+            del self.column_weights[column]
 
-        # removing the columns from self.columns if they are not in the df
-        na_cols = []
+    def check_na_columns(self):
         for column in self.columns:
-            if column not in df:
-                print(f'WARNING: column {column} was in column(_weights) but is not in df, removing it')
-                na_cols.append(column)
-            if max(df[column]) == min(df[column]):
-                print(f'WARNING: column {column} has only one value, removing it')
-                na_cols.append(column)
+            if column not in self.raw_df:
+                self.remove_na_column(column)
+                if self.verbose:
+                    print(f'WARNING: column {column} was in column(_weight)s but is not in df, removing it')
+            elif max(self.raw_df[column]) == min(self.raw_df[column]):
+                self.remove_na_column(column)
+                if self.verbose:
+                    print(f'WARNING: column {column} has only one value, removing it')
 
-        for column in na_cols:
-            self.columns.remove(column) # TODO: seems to run into an error, trying to remove Index if column_weights is not given
-            if self.column_weights is not None:
-                del self.column_weights[column]
+    # functions to prepare the data for the distance calculation
+    def _prepare_data(self):
+        # removing the columns from self.columns if they are not in the df or if they have 1 value
+        self.check_na_columns()
 
-        df = df[['id'] + self.columns]
+        # select the columns that are needed for the distance calculation
+        self.sub_df = self.raw_df[['id'] + self.columns]
 
         if self.normalize_columns is not None:
-            normalized_df = self._normalize(df)
-        else:
-            normalized_df = df
+            self.sub_df = self._normalize(self.sub_df)
 
         # weighted columns only if needed (if column_weights is given)
         if self.column_weights is not None:
-            prepared_df = self._weighted_columns(normalized_df)
+            self.prepared_df = self._weighted_columns(self.sub_df)
         else:
-            prepared_df = normalized_df
-
-        return prepared_df
+            self.prepared_df = self.sub_df
 
     def _normalize(self, df):
         """normalize the columns in the geopandas dataframe so that every feature has the same weight in the distance calculation"""
@@ -221,6 +221,7 @@ class similarity:
             # logging if needed
             if self.verbose and len(self.prepared_df) > len(self.X):
                 print(f"INFO: Removed {len(self.prepared_df) - len(self.X)} rows with NaN values. Cannot compare / cluster buildings with NaN values")
+        # fill the NaN values with the mean of the column or a zero. Also log the columns with missing values and the number of N/A values
         elif na_mode in ['mean', 'zero']:
             na_values, na_columns = 0, []
             for column in self.columns:
@@ -248,7 +249,7 @@ class similarity:
         if na_mode not in ['mean', 'drop', 'zero']:
             raise ValueError("na_mode must be either 'mean' or 'drop'")
         if hasattr(self, 'prepared_df') == False:
-            self.prepared_df = self._prepare_data(self.feature_space_file)
+            self._prepare_data()
         self.X = self.prepared_df.copy()
 
         # drop rows with NaN values and save the ids as they are not relevant for the clustering
