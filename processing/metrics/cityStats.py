@@ -44,30 +44,20 @@ def convexhull_volume(points):
         print(f"Error: {e}")
         return 0
 
-def get_errors_from_report(report, objid, cm):
-    """Return false / true if it finds error in the val3dity report"""
-    if report == {}:
-        return False
-    elif not "features" in report:
-        return False
-
+def get_errors(objid, cm):
+    """Return false / true if it finds val3dity error in the cityjson"""
     obj = cm["CityObjects"][objid]
 
     if not "geometry" in obj or len(obj["geometry"]) == 0:
         return False
 
-    if "parents" in obj:
-        parid = obj["parents"][0]
+    parid = obj["parents"][0] # we can asume that there is a parent, as we only process buildingparts in egible function
+    b3_val3dity_lod22 = cm['CityObjects'][parid]['attributes']['b3_val3dity_lod22']
+    
+    if b3_val3dity_lod22 == '[]':
+        return False
     else:
-        parid = None
-
-    for f in report["features"]:
-        if f["id"] in [parid, objid]:
-            if f['validity'] == False:
-                return True
-            else:
-                return False
-    return False
+        return True
 
 def check_suitability(df, formatted_ids):
     ## filter based on some conditions
@@ -106,7 +96,7 @@ def clean_df(df, formatted_ids, val3dity_errors, verbose=True):
     
     perc_bag_errors = 1 - (len(df)+val3dity_errors) / len(formatted_ids)
     lost_perc = f"""\t{perc_bag_errors:.2%} \t has issues with the BAG data, meaning that they were not found in the BAG or had an error
-        {val3dity_errors/len(formatted_ids):.2%} \t has issues with their 3d shape (val3dity report)\n"""
+        {val3dity_errors/len(formatted_ids):.2%} \t has issues with their 3d shape (val3dity error)\n"""
     
     clean, perc_convex, perc_vol40, perc_holes = check_suitability(df, formatted_ids)
     clean = clean.drop(columns=["hole_count", 'min_vertical_elongation', 'max_vertical_elongation'], axis=1)
@@ -126,7 +116,7 @@ def clean_df(df, formatted_ids, val3dity_errors, verbose=True):
         print(f"{header}\n{lost_perc}")
     return clean
 
-def eligible(cm, id, report):
+def eligible(cm, id):
     """Returns True if the building is eligible for processing, otherwise returns False"""    
     # we only process buildingparts as they are 3D
     if cm["CityObjects"][id]['type'] != 'BuildingPart':
@@ -137,12 +127,9 @@ def eligible(cm, id, report):
     if len(cm['CityObjects'][parent_id]['children']) > 1:
         return False
 
-    # check if there are any errors with the building in the val3dity report
-    errors = get_errors_from_report(report, id, cm)
-    if errors:
-        return False
-    else:
-        return True
+    # check if there are any val3dity errors with the building
+    errors = get_errors(id, cm)
+    return not errors
 
 def get_parent_attributes(cm, obj):
     """Returns the attributes of the parent of the given object. The parent should be in the same city model."""
@@ -153,26 +140,6 @@ def get_parent_attributes(cm, obj):
         return parent['attributes']
     else:
         return None
-
-def get_report(input):
-    # create the val3dity report with the same name as the input file
-    val3dity_report = f"{input[:-5]}_report.json"
-    
-    try:
-        # determine the location of the val3dity executable
-        file_dir = os.path.dirname(os.path.realpath(__file__))
-        val3dity_cmd_location = os.path.join(file_dir, 'val3dity/val3dity')
-
-        # TODO: make this subprocess again so that the output is not printed
-        command = f'""{val3dity_cmd_location}" "{input}" -r "{val3dity_report}""'
-        os.system(command)
-        # subprocess.check_output(f'{val3dity_cmd_location} {input.name} -r {val3dity_report}')
-        with open(val3dity_report, "rb") as f:
-            report = json.load(f)
-    except Exception as e:
-        report = {}
-        print(f"Warning: Could not run val3dity, continuing without report. Message: {e}")
-    return report
 
 class StatValuesBuilder:
 
@@ -210,11 +177,17 @@ def add_purpose_of_use(values, actual_use):
         print(f'WARNING: Found {uses_found} uses, but expected {len(actual_use)}. actual_use: {actual_use}')
     return values    
 
+def get_n_val3dity_errors(cm):
+    total = 0
+    for building in cm["CityObjects"].values():
+        if 'attributes' in building:
+            if building['attributes']['b3_val3dity_lod22'] != '[]':
+                total += 1
+    return total
+
 def process_building(building,
                      obj,
                      filter,
-                     repair,
-                     plot_buildings,
                      density_2d,
                      density_3d,
                      vertices,
@@ -241,18 +214,9 @@ def process_building(building,
         print(f"{obj} geometry parsing crashed! Omitting...")
         return obj, {"type": building["type"]}
 
-    tri_mesh, t = geometry.move_to_origin(tri_mesh)
+    tri_mesh, _ = geometry.move_to_origin(tri_mesh)
 
-    if plot_buildings:
-        print(f"Plotting {obj}")
-        tri_mesh.plot(show_grid=True)
-
-    if repair:
-        mfix = MeshFix(tri_mesh)
-        mfix.repair()
-        fixed = mfix.mesh
-    else:
-        fixed = tri_mesh
+    fixed = tri_mesh
 
     points = cityjson.get_points(geom, vertices)
     ch_volume = convexhull_volume(points)
@@ -284,7 +248,6 @@ def process_building(building,
     # Get the dimensions of the 2D oriented bounding box
     S, L = si.get_box_dimensions(obb_2d)
 
-    # TODO: check if we can add errors from b3_val3dity_lod22
     b3_opp_grond = building['attributes'].get("b3_opp_grond")
     if b3_opp_grond is not None:
         b3_hellingshoek_proxy = building['attributes'].get("b3_opp_dak_plat", 0) + building['attributes'].get("b3_opp_dak_schuin", 0) / b3_opp_grond
@@ -364,8 +327,6 @@ def calculate_metrics(input,
                     formatted_ids,
                     output_path=None,
                     filter=None,
-                    repair=False,
-                    plot_buildings=False,
                     without_indices=False,
                     jobs=1,
                     density_2d=1.0,
@@ -375,17 +336,6 @@ def calculate_metrics(input,
 
     with open(input, "r") as f:
         cm = json.load(f)
-
-        # create and open the report
-        report = get_report(input)
-
-        val3dity_errors = 0
-        for building in report["features"]:
-            if building["validity"] == False:
-                val3dity_errors += 1
-        
-        if os.path.exists('val3dity.log'): # clean the mess
-            os.remove('val3dity.log')
 
     if "transform" in cm:
         s = cm["transform"]["scale"]
@@ -401,9 +351,8 @@ def calculate_metrics(input,
     # Count the number of jobs
     total_jobs = 0
     for obj in cm["CityObjects"]:
-        if eligible(cm, obj, report):
+        if eligible(cm, obj):
             total_jobs += 1
-
 
     num_cores = jobs
     if verbose:
@@ -412,7 +361,7 @@ def calculate_metrics(input,
         # add the jobs to the pool
         futures = []
         for obj in cm["CityObjects"]:
-            if not eligible(cm, obj, report):
+            if not eligible(cm, obj):
                 continue
 
             building = cm["CityObjects"][obj]
@@ -425,8 +374,6 @@ def calculate_metrics(input,
                                 building,
                                 obj,
                                 filter,
-                                repair,
-                                plot_buildings,
                                 density_2d,
                                 density_3d,
                                 vertices,
@@ -451,7 +398,8 @@ def calculate_metrics(input,
     df.index.name = "id"
 
     try:
-        clean = clean_df(df, formatted_ids, val3dity_errors, verbose)
+        n_val3dity_errors = get_n_val3dity_errors(cm)
+        clean = clean_df(df, formatted_ids, n_val3dity_errors, verbose)
     except Exception as e:
         print(f"ERROR: Problem with cleaning the dataframe, using the original. Error message: {e}")
         clean = df

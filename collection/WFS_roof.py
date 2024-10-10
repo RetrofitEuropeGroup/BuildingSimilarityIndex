@@ -39,7 +39,10 @@ async def roofmetrics(bagid=None, bbox=None, verbose=False, session=None):
     
 
     # Create GeoDataFrame from geojson and set coordinate reference system
-    data = gpd.GeoDataFrame.from_features(geojson.loads(r), crs="EPSG:7415")
+    json_content = geojson.loads(r)
+    if json_content.get('bbox') is None:
+        return None
+    data = gpd.GeoDataFrame.from_features(json_content, crs="EPSG:7415")
     data = data[data['identificatie'] == bagid]
 
     # calculate max height of the roofparts
