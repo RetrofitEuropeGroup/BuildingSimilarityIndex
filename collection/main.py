@@ -17,6 +17,7 @@ class collection():
 
     def __init__(self, bag_data_folder: str, all_ids: list = None, neighborhood_id: str = None,  verbose: bool = False):
         self._bag_data_folder = bag_data_folder
+        self._check_bag_data_folder() # creates the dir if needed, also check if it is not a file
         self._verbose = verbose
         self.key = self._get_key()
         self.formatted_ids = self.format_ids(all_ids, neighborhood_id)
@@ -190,8 +191,6 @@ class collection():
 
     def collect_id_list(self, force_new=False):
         """Requests and save the data in cityjson format for all the ids in the list."""
-        self._check_bag_data_folder()
-
         # Remove the prefix from the ids so they are consistent. also check if the file already exists to avoid unnecessary requests
         self._set_request_ids(force_new)
 
