@@ -283,7 +283,10 @@ def remove_straight_vertices(pol, tolerance=5):
         p1 = np.array([xx[i-1], yy[i-1]]) - p2
         p3 = np.array([xx[(i+1)%nr_coords], yy[(i+1)%nr_coords]]) - p2
         if not(np.array_equal(p1, p3)):
-            angle = 360*np.arccos(np.dot(p1, p3)/(np.sqrt(np.dot(p1, p1))*np.sqrt(np.dot(p3, p3))))/(2*np.pi)
+            denom = (np.sqrt(np.dot(p1, p1))*np.sqrt(np.dot(p3, p3)))
+            if denom == 0:
+                denom = sys.float_epsilon
+            angle = 360*np.arccos(np.dot(p1, p3)/denom)/(2*np.pi)
             if not((180-tolerance) < angle and angle < (180 + tolerance)):
                 xx_new += [xx[i]]
                 yy_new += [yy[i]]
