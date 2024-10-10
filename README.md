@@ -16,12 +16,12 @@ A Python library inspired by the [3d-building-metrics repo](https://github.com/t
 
 - The **collection** module downloads CityJSON files from the 3D-BAG based on a list of [BAG IDs](https://www.geobasisregistraties.nl/basisregistraties/adressen-en-gebouwen) or a [neighborhood ID](https://catalogus.kadaster.nl/brt/en/page/Buurt?clang=nl).
 - The **processing** module merges the downloaded CityJSON files, calculates 2D/3D metrics, filters out unsuitable buildings (based on abnormal metric values), and applies a turning function. The output is a Pandas Dataframe containing the BAG IDs and the calculated metrics.
-- The **similarity_calculation** module preprocesses the data for similarity calcuation by scaling, normalizing, handeling N/A values and selecting relevant columns. The most basic form of similarity_calculation is to calculate the distance between two individual buildings. More advanced options are to calculate a (reference) distance matrix or to run ML-algorithms such as DBSCAN or K-Means
+- The **similarity_calculation** module preprocesses the data for similarity calculation by scaling, normalizing, handling N/A values and selecting relevant columns. The most basic form of similarity_calculation is to calculate the distance between two individual buildings. More advanced options are to calculate a (reference) distance matrix or to run ML-algorithms such as DBSCAN or K-Means
 
 ## Prerequisites
 
 - python==3.11
-- A API key for the BAG. If you don't have one, you can [apply](https://www.kadaster.nl/zakelijk/producten/adressen-en-gebouwen/bag-api-individuele-bevragingen) for it free of charge
+- An API key for the BAG. If you don't have one, you can [apply](https://www.kadaster.nl/zakelijk/producten/adressen-en-gebouwen/bag-api-individuele-bevragingen) for it free of charge
 
 ## Usage
 All modules can be used individually but are combined in BuildingSimilarity. Go to the demo directory for an example of how to use the module.
