@@ -50,14 +50,8 @@ class similarity:
             self.columns.remove("id")
 
     # functions to prepare the data for the distance calculation
-    def _prepare_data(self, feature_space_file, feature_space_ref_file = None): # TODO: is this the right way to handle the reference file?
+    def _prepare_data(self, feature_space_file): # TODO: is this the right way to handle the reference file?
         df = pd.read_csv(feature_space_file, dtype={'id': str})
-        if feature_space_ref_file is not None:
-            df_ref = pd.read_csv(feature_space_ref_file)
-            ref_ids = df_ref['id']
-            df = pd.concat([df, df_ref])
-        # if self.columns is None:
-        #     self._set_columns(df.columns)
 
         # removing the columns from self.columns if they are not in the df
         na_cols = []
@@ -87,12 +81,7 @@ class similarity:
         else:
             prepared_df = normalized_df
 
-        if feature_space_ref_file is not None:
-            prepared_df_ref = prepared_df[prepared_df['id'].isin(ref_ids)]
-            prepared_df = prepared_df[~prepared_df['id'].isin(ref_ids)]
-            return prepared_df, prepared_df_ref
-        else:
-            return prepared_df
+        return prepared_df
 
     def _normalize(self, df):
         """normalize the columns in the geopandas dataframe so that every feature has the same weight in the distance calculation"""
