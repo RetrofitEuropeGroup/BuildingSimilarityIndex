@@ -158,7 +158,6 @@ def get_report(input):
     # create the val3dity report with the same name as the input file
     val3dity_report = f"{input[:-5]}_report.json"
     
-    # TODO: try to get this from the api call
     try:
         # determine the location of the val3dity executable
         file_dir = os.path.dirname(os.path.realpath(__file__))
@@ -324,7 +323,6 @@ def process_building(building,
     grid = voxel.cell_centers().points
 
     builder = StatValuesBuilder(values, custom_indices)
-    # TODO: we might want to round this to 2 decimals to save storage space
     builder.add_index("circularity_2d", lambda: si.circularity(shape))
     builder.add_index("hemisphericality_3d", lambda: si.hemisphericality(fixed))
     builder.add_index("convexity_2d", lambda: shape.area / shape.convex_hull.area)
@@ -419,7 +417,7 @@ def calculate_metrics(input,
 
             building = cm["CityObjects"][obj]
             if 'attributes' not in building:
-                building['attributes'] = get_parent_attributes(cm, obj) #TODO: check do we process multiple childs of the same parent?
+                building['attributes'] = get_parent_attributes(cm, obj) #TODO: check do we process multiple childs of the same parent? --> No we don't
 
             indices_list = [] if without_indices else None
 
