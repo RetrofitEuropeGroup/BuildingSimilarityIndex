@@ -24,7 +24,6 @@ class similarity:
         self.verbose = verbose
         self.feature_space_file = feature_space_file
         self.normalize_columns = normalize_columns
-        self.raw_df = pd.read_csv(self.feature_space_file, dtype={'id': str})
         
         # these are needed as we want to know which columns are relevant for the distance calculation, and if the columns should be weighted
         self._validate_input(column_weights, columns)
@@ -68,6 +67,8 @@ class similarity:
 
     # functions to prepare the data for the distance calculation
     def _prepare_data(self):
+        self.raw_df = pd.read_csv(self.feature_space_file, dtype={'id': str})
+
         # removing the columns from self.columns if they are not in the df or if they have 1 value
         self.check_na_columns()
 
