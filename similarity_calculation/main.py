@@ -93,7 +93,8 @@ class similarity:
                 prepared_df[column] = prepared_df[column].astype(float)
             
             if column in self.normalize_columns:
-                prepared_df[column] = (prepared_df[column] - prepared_df[column].mean()) / prepared_df[column].std()
+                # 0.25 so that, if we assume normal distribution, we can say that 95% of the values are within a range of 1 
+                prepared_df[column] = ((prepared_df[column] - prepared_df[column].mean()) / prepared_df[column].std()) * 0.25 
         return prepared_df
     
     def _weighted_columns(self, df):
