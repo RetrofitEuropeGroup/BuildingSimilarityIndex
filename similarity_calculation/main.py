@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 
@@ -43,10 +44,12 @@ class similarity:
             self.columns = list(self.column_weights.keys())
         elif columns is not None:  # if columns is given, remove the id column
             self.columns = columns            
-        else:
+        elif os.path.exists(self.feature_space_file):
             self.columns = pd.read_csv(self.feature_space_file, dtype={'id': str}).columns.tolist() # TODO: load the fs in init and use it here
+        else:
+            self.columns = None
 
-        if "id" in self.columns: # ID can never be used for distance calculation
+        if isinstance(self.columns, list) and "id" in self.columns: # ID can never be used for distance calculation
             self.columns.remove("id")
 
     def remove_na_column(self, column):
