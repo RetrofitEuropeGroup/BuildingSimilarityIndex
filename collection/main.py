@@ -29,10 +29,10 @@ class collection():
         return key
     
     def format_ids(self, all_ids=None, neighborhood_id=None):
-        if all_ids is None and neighborhood_id is None:
-            raise ValueError("Either all_ids or neighborhood_id should be provided to the BuildingSimilarity class.")
         if neighborhood_id is not None:
             all_ids = asyncio.run(hoodcollector(neighborhood_id, verbose=self._verbose))
+        elif all_ids is None:
+            raise ValueError("Either all_ids or neighborhood_id should be provided to the BuildingSimilarity class.")
 
         formatted_ids = []
         for id in all_ids:        
@@ -106,9 +106,6 @@ class collection():
 
         params = {'pandIdentificatie':id}
         r = await session.get(url, params=params, headers=headers)
-        # if r.status != 200 and retries == 0:
-            # with open('errors.csv', 'a') as file:
-            #     file.write(f"regular,{id},{r.status}\n")
         if r.status == 429 and retries < 1:
             await asyncio.sleep(2)
             return await self._get_additional_bag_attributes(id, session, retries+1)
@@ -119,10 +116,7 @@ class collection():
     async def _get_3d_bag(self, id: str, session, retries=0):
         url = self._make_url(id)
         r = await session.get(url)
-        # if r.status != 200 and retries == 0:
-            # with open('errors.csv', 'a') as file:
-            #     file.write(f"3d,{id},{r.status}\n")
-        if r.status == 429 and retries < 1:
+        if (r.status == 429 or r.status == 502) and retries < 1:
             await asyncio.sleep(2) # to avoid the rate limit
             return await self._get_3d_bag(id, session, retries+1)
         r.raise_for_status()
@@ -165,7 +159,7 @@ class collection():
                     bag3d_data, bag_attributes = await asyncio.gather(*tasks)
                     roof_attributes = await self._get_roof_attributes(id, bag3d_data, session)
                 if roof_attributes is None:
-                    return # if the roof attributes are not available, the building is not saved
+                    raise Exception('Roof attributes are not available')                    
                 cityjson = self._convert_to_cityjson(bag3d_data, bag_attributes, roof_attributes, id)
                 self._save(cityjson, id) # use request_ids to get the right id without the pre- and suffix
             except KeyboardInterrupt:
@@ -188,8 +182,7 @@ class collection():
         await asyncio.gather(*tasks)
         self.bar.close()
 
-        if self._verbose:
-            print(f"{self.errors} error(s) occurred while requesting the data.")
+        print(f"{self.errors} error(s) occurred while requesting the data, collected {len(self.request_ids) - self.errors} building(s).")
 
     def collect_id_list(self, force_new=False):
         """Requests and save the data in cityjson format for all the ids in the list."""
