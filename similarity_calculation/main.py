@@ -43,8 +43,8 @@ class similarity:
         if self.column_weights is not None:  # overwrite columns if column_weights is given
             self.columns = list(self.column_weights.keys())
         elif columns is not None:  # if columns is given, remove the id column
-            self.columns = columns            
-        elif os.path.exists(self.feature_space_file):
+            self.columns = columns
+        elif self.feature_space_file is not None and os.path.exists(self.feature_space_file):
             self.columns = pd.read_csv(self.feature_space_file, dtype={'id': str}).columns.tolist() # TODO: load the fs in init and use it here
         else:
             self.columns = None

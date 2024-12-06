@@ -28,7 +28,9 @@ class processing():
         self._verbose = verbose
 
     def _set_feature_space_file(self, file_path: str):
-        if file_path.endswith('.csv') == False:
+        if file_path is None:
+            print('Warning: the feature_space_file is None')
+        elif file_path.endswith('.csv') == False:
             raise ValueError("The feature_space_file can only be a .csv file")
         else:
             parent_dir = os.path.dirname(file_path)
