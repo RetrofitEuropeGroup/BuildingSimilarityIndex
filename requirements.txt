@@ -5,6 +5,7 @@ cython==3.0.10
 pandas==2.2.2
 geopandas==0.14.4
 fiona==1.9.6
+vtk==9.3.0
 tqdm==4.66.2
 shapely===1.8.5
 mapbox-earcut==1.0.1
