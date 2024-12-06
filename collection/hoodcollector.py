@@ -1,11 +1,11 @@
 import aiohttp
-import pandas as pd
+import re
 import geopandas as gpd
 import asyncio
 from shapely.geometry import mapping
 
 
-async def get_neighborhood(hoodid, session, verbose=False):
+async def get_neighborhood(hoodid, session):
     # set the parameters for the request
     hoodparams = dict(
         SERVICE="WFS",
@@ -31,9 +31,33 @@ def create_coor_str(geometry):
     coordinates = mapping(geometry.boundary.geoms[0])['coordinates']
     coordinatestring = ''
     for i in coordinates:
-        coordinatestring += f'{i[0]}+{i[1]},'
+        coordinatestring += f'{i[0]} {i[1]},'
     coordinatestring = coordinatestring[:-1]
     return coordinatestring
+
+def create_xml_query(neighborhood):
+    geometry = neighborhood['geometry'].values[0]
+    coordinatestring = create_coor_str(geometry)
+
+    query = f"""<?xml version="1.0" encoding="utf-8"?>
+    <GetFeature xmlns="http://www.opengis.net/wfs/2.0" xmlns:gml="http://www.opengis.net/gml/3.2" service="WFS" version="2.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://schemas.opengis.net/wfs/2.0/wfs.xsd http://schemas.opengis.net/wfs/2.0.0/WFS-transaction.xsd">
+        <Query typeNames="pand" xmlns:bag="http://bag.geonovum.nl">
+            <fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0">
+                <fes:Intersects>
+                    <fes:ValueReference>geometrie</fes:ValueReference>
+                    <gml:Polygon gml:id="filter" srsName="urn:ogc:def:crs:EPSG::28992">
+                        <gml:exterior>
+                            <gml:LinearRing>
+                                <gml:posList srsDimension="2">{coordinatestring}</gml:posList>
+                            </gml:LinearRing>
+                        </gml:exterior>
+                    </gml:Polygon>
+                </fes:Intersects>
+            </fes:Filter>
+        </Query>
+    </GetFeature>"""
+    return query
+
 
 async def hoodcollector(hoodid=None, session=None, verbose=False):
     """
@@ -50,40 +74,20 @@ async def hoodcollector(hoodid=None, session=None, verbose=False):
 
     # Check if the hoodid is given and valid, if not use a default value
     if not hoodid or not isinstance(hoodid, str) or not hoodid.startswith("BU"):
+        print(f'No (valid) hood id provided: {hoodid}, using default value BU03560803: Hoven-West te Nieuwegein')
         hoodid = 'BU03560803'
-        print(f'No (valid) hood id provided, using default value {hoodid}: Hoven-West te Nieuwegein')
         verbose = True
 
-    neighborhood = await get_neighborhood(hoodid, session, verbose)
-    
-    # convert geometry to string with the coordinates of the boundary of the neighbourhood
-    geometry = neighborhood['geometry'].values[0]
-    coordinatestring = create_coor_str(geometry)
+    neighborhood = await get_neighborhood(hoodid, session)
 
-    # set the parameters for the request loop
-    count = 1000  # Number of records to fetch per request
-    start_index = 0  # Starting point for fetching records
-    ids = []
+    data = create_xml_query(neighborhood)
+    url = "https://service.pdok.nl/lv/bag/wfs/v2_0"
+    headers = {"Content-Type": "application/xml"}
 
-    while True: # loop until we don't get any more buildings
-        url = (f"https://service.pdok.nl/lv/bag/wfs/v2_0?request=GetFeature&service=WFS&version=2.0.0&typeName=bag:pand"
-               f"&SRSNAME=EPSG:28992&count={count}&startindex={start_index}&sortby=bag:identificatie&outputFormat"
-               f"=geojson&Filter=%3CFilter%3E%3CIntersects%3E%3CPropertyName%3EGeometry"
-               f"%3C/PropertyName%3E%3Cgml:Polygon%3E%3Cgml:outerBoundaryIs%3E%3Cgml:LinearRing%3E%3Cgml:coordinates%3E"
-               f"{coordinatestring}%3C/gml:coordinates%3E+%3C/gml:LinearRing%3E%3C/gml:outerBoundaryIs%3E%3C/gml:Polygon"
-               f"%3E%3C/Intersects%3E%3C/Filter%3E")
-
-        # Perform the request
-        r = await session.get(url)
-        r.raise_for_status()
-        building_data = await r.text()
-
-        new_buildings = gpd.read_file(building_data)
-        if len(new_buildings) > 0:
-            ids.extend(new_buildings['identificatie'].tolist())
-            start_index += count
-        else:
-            break
+    r = await session.post(url, headers=headers, data=data)
+    r.raise_for_status()
+    building_data = await r.text()
+    ids = re.findall("(?<=<bag:identificatie>)\d{16}(?=<\/bag:identificatie>)", building_data)
     
     # finish the function by: printing the number of buildings found, closing the session if needed and returning the ids
     if verbose:
@@ -95,4 +99,4 @@ async def hoodcollector(hoodid=None, session=None, verbose=False):
     return ids
 
 if __name__ == "__main__":
-    print(asyncio.run(hoodids('BU03560803', verbose=True)))
+    asyncio.run(hoodcollector('BU03560803'))
