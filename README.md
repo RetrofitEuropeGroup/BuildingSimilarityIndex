@@ -44,6 +44,15 @@ BAG_API_KEY=your_api_key_here
 
 Make sure to replace `your_api_key_here` with your actual BAG API key.
 
+
+<br/><br/>
+Note, it might be that you run in the following error: <i>ImportError: libXrender.so.1: cannot open shared object file: No such file or directory</i>
+This error should be solved by running the following command:
+```bash
+ImportError: libXrender.so.1: cannot open shared object file: No such file or directory
+```
+
+
 ## Show your support
 
 Give a ⭐️ if this project helped you!
