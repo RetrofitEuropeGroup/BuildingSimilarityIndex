@@ -44,13 +44,19 @@ BAG_API_KEY=your_api_key_here
 
 Make sure to replace `your_api_key_here` with your actual BAG API key.
 
+### Potential errors
 
-<br/><br/>
-Note, it might be that you run in the following error: <i>ImportError: libXrender.so.1: cannot open shared object file: No such file or directory</i>
-This error should be solved by running the following command:
+Note, it might be that you run into some errors. They are listed below with an solution (on Ubuntu 22.04):
+
+<i>ImportError: libXrender.so.1: cannot open shared object file: No such file or directory</i>
 ```bash
-ImportError: libXrender.so.1: cannot open shared object file: No such file or directory
+apt-get install libxrender1
 ```
+<i>ImportError: libGL.so.1: cannot open shared object file: No such file or directory</i>
+```bash
+apt-get install libgl1
+```
+
 
 
 ## Show your support
