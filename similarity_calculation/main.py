@@ -71,6 +71,8 @@ class similarity:
     # functions to prepare the data for the distance calculation
     def _prepare_data(self):
         self.raw_df = pd.read_csv(self.feature_space_file, dtype={'id': str})
+        if self.columns is None:
+            self._set_columns()
 
         # removing the columns from self.columns if they are not in the df or if they have 1 value
         self.check_na_columns()
