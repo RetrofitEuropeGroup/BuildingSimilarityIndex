@@ -123,14 +123,14 @@ class collection():
         r = await r.json()
         return r
 
-    def _get_bbox(self, id: str, data: dict):
+    def _get_bbox(self, data: dict):
         """Get the bounding box of a building from the 3D-BAG API."""
         translate = data['metadata']['transform']['translate']
         centroid_x, centroid_y = translate[0], translate[1]
         return f"{centroid_x-10},{centroid_y-10},{centroid_x+10},{centroid_y+10}"
 
     async def _get_roof_attributes(self, id: str, data: dict, session):
-        bbox = self._get_bbox(id, data)
+        bbox = self._get_bbox(data)
         return await roofmetrics(id, bbox, session=session)
 
     def _set_request_ids(self, force_new=False):
