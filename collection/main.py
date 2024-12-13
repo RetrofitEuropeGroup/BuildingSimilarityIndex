@@ -8,6 +8,7 @@ import time
 
 from collection.WFS_roof import roofmetrics
 from collection.hoodcollector import hoodcollector
+from pathlib import Path
 
 class collection():
     """
@@ -64,6 +65,7 @@ class collection():
         """Saves the CityJSON data to a file."""
         with open(f'{self._bag_data_folder}/{id}.city.json', 'w') as file:
             json.dump(cityjson, file)
+        print(Path(f'{self._bag_data_folder}/{id}.city.json').resolve())
 
     def _check_bag_data_folder(self):
         """Checks if the bag_data folder exists and is a folder, if not it will be created. If it exists and is not empty, a warning is printed."""
