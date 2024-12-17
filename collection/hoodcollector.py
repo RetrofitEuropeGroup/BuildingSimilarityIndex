@@ -79,6 +79,11 @@ async def hoodcollector(hoodid=None, session=None, verbose=False):
         verbose = True
 
     neighborhood = await get_neighborhood(hoodid, session)
+    if len(neighborhood['geometry'].values) == 0:
+        print(f'No neighbourhood found with id "{hoodid}"')
+        if close_session:
+            await session.close()
+        return []
 
     data = create_xml_query(neighborhood)
     url = "https://service.pdok.nl/lv/bag/wfs/v2_0"
