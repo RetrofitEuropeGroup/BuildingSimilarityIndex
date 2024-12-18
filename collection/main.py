@@ -78,8 +78,6 @@ class collection():
         # get the adressen and their info
         adressen = result.get('_embedded', {}).get('adressen')
         if adressen is None:
-            # with open('errors.csv', 'a') as file:
-            #     file.write(f"adressen,{id},429\n")
             return {}
         
         # loop over the adresses to get the relevant information
