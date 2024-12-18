@@ -35,12 +35,12 @@ def create_coor_str(geometry):
     coordinatestring = coordinatestring[:-1]
     return coordinatestring
 
-def create_xml_query(neighborhood):
+def create_xml_query(neighborhood, start_index):
     geometry = neighborhood['geometry'].values[0]
     coordinatestring = create_coor_str(geometry)
 
     query = f"""<?xml version="1.0" encoding="utf-8"?>
-    <GetFeature xmlns="http://www.opengis.net/wfs/2.0" xmlns:gml="http://www.opengis.net/gml/3.2" service="WFS" version="2.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://schemas.opengis.net/wfs/2.0/wfs.xsd http://schemas.opengis.net/wfs/2.0.0/WFS-transaction.xsd">
+    <GetFeature xmlns="http://www.opengis.net/wfs/2.0" xmlns:gml="http://www.opengis.net/gml/3.2" service="WFS" version="2.0.0" startIndex="{start_index}" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://schemas.opengis.net/wfs/2.0/wfs.xsd http://schemas.opengis.net/wfs/2.0.0/WFS-transaction.xsd">
         <Query typeNames="pand" xmlns:bag="http://bag.geonovum.nl">
             <fes:Filter xmlns:fes="http://www.opengis.net/fes/2.0">
                 <fes:Intersects>
@@ -85,14 +85,20 @@ async def hoodcollector(hoodid=None, session=None, verbose=False):
             await session.close()
         return []
 
-    data = create_xml_query(neighborhood)
     url = "https://service.pdok.nl/lv/bag/wfs/v2_0"
     headers = {"Content-Type": "application/xml"}
+    ids = []
+    while True:
+        data = create_xml_query(neighborhood, start_index=len(ids))
 
-    r = await session.post(url, headers=headers, data=data)
-    r.raise_for_status()
-    building_data = await r.text()
-    ids = re.findall("(?<=<bag:identificatie>)\d{16}(?=<\/bag:identificatie>)", building_data)
+        r = await session.post(url, headers=headers, data=data)
+        r.raise_for_status()
+        building_data = await r.text()
+        
+        extracted_ids = re.findall("(?<=<bag:identificatie>)\d{16}(?=<\/bag:identificatie>)", building_data)
+        ids.extend(extracted_ids)
+        if len(extracted_ids) < 1000:
+            break
     
     # finish the function by: printing the number of buildings found, closing the session if needed and returning the ids
     if verbose:
@@ -104,4 +110,4 @@ async def hoodcollector(hoodid=None, session=None, verbose=False):
     return ids
 
 if __name__ == "__main__":
-    asyncio.run(hoodcollector('BU03560803'))
+    asyncio.run(hoodcollector('BU03560803', verbose=True))
