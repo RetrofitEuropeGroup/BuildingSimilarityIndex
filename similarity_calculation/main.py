@@ -123,7 +123,7 @@ class similarity:
         # if all good, return the ids
         return id1, id2
 
-    def _update_matrix(self, id1, other_ids, dist_matrix_path: str, n_zero_distances=0):
+    def _write_row(self, id1, other_ids, dist_matrix_path: str, n_zero_distances=0):
         # calculate the distance between the object and all other
         row = np.array([id1] + [0] * n_zero_distances)
         for id2 in other_ids:
@@ -177,7 +177,7 @@ class similarity:
         # loop over all objects and calculate the distance to the reference objects
         self.progress = tqdm(total=len(regular_ids)*len(reference_ids), desc="Calculating distance matrix")
         for id1 in regular_ids:
-            self._update_matrix(id1, reference_ids)
+            self._write_row(id1, reference_ids)
             
             # save the matrix to a file if the interval is reached
             if isinstance(dist_matrix_path, str) and self.matrix.ndim > 1 and self.matrix.shape[0] % save_interval == 0:
@@ -205,7 +205,7 @@ class similarity:
         total_jobs = int(len(self.ids) * (len(self.ids) - 1) / 2)
         self.progress = tqdm(total=total_jobs, desc="Calculating distance matrix")
         for i, id1 in enumerate(self.ids):
-            self._update_matrix(id1, self.ids[i+1:], dist_matrix_path, n_zero_distances=i+1)
+            self._write_row(id1, self.ids[i+1:], dist_matrix_path, n_zero_distances=i+1)
 
             # save the matrix to a file if the interval is reached or if it is the last iteration
         self.progress.close()
