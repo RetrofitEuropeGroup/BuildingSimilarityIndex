@@ -123,37 +123,35 @@ class similarity:
         # if all good, return the ids
         return id1, id2
 
-    def _write_row(self, id1, other_ids, dist_matrix_path: str, n_zero_distances=0):
+    def _write_row(self, i: int, dist_matrix_path: str, mirror: bool):
+        """
+        Writes a row of distances to the distance matrix file.
+        Parameters:
+        i (int): Index of the object for which the distances are being calculated.
+        dist_matrix_path (str): Path to the file where the distance matrix is stored.
+        mirror (bool): If True, only calculates the distance above the diagonal, 
+                       assuming the ids on the x-axis and y-axis of the distance matrix are the same. 
+        Returns:
+        None
+        """
+        if mirror:
+            n_zero_distances = i + 1 # only calculate the distance above the diagonal
+        else:
+            n_zero_distances = 0
+        id1 = self.ids[i]            
+        row = np.array([id1] + [0] * n_zero_distances)  # if mirror, fill the part below the diagonal with zeros, they will be filled later
+        
         # calculate the distance between the object and all other
-        row = np.array([id1] + [0] * n_zero_distances)
-        for id2 in other_ids:
-            dist = self.calculate_distance(id1, id2)
-            row = np.append(row, round(dist, 5))
+        if n_zero_distances < len(self.ids):
+            other_objects = self.X[n_zero_distances:]
+            obj1 = self.X[i].reshape(1, -1)
+            distances = euclidean_distances(obj1, other_objects).round(5)
+            row = np.concatenate([row, distances[0]])
+            self.progress.update(len(other_objects))
 
-        # Write the new row to dist_matrix_path
-        if dist_matrix_path is not None:
-            with open(dist_matrix_path, 'a') as f:
-                f.write(','.join(map(str, row)) + '\n')
-        self.progress.update(len(other_ids))
-
-    def calculate_distance(self, id1, id2):
-        if hasattr(self, 'X') == False:
-            raise ValueError("The feature space data has not been prepared yet. Please run the set_X() function first.")
-        id1, id2 = self._check_ids(id1, id2)
-
-        # for obj2 consider the reference geopandas dataframe if it is given, otherwise use the original geopandas dataframe
-        obj1 = self.X.iloc[list(self.ids).index(id1)] # TODO: shouldn't we change self.ids to a list?
-        obj2 = self.X.iloc[list(self.ids).index(id2)]
-        obj1_fs = obj1[self.columns].array.reshape(1, -1)
-        obj2_fs = obj2[self.columns].array.reshape(1, -1)
-
-        # calculate the euclidean distance between the two objects
-        dist = euclidean_distances(obj1_fs, obj2_fs)
-        return dist[0][0]
-
-    def calculate_similarity(self, id1, id2):
-        dist = self.calculate_distance(id1, id2)
-        return 1 / (1 + dist)
+        # Write (only) the new row to dist_matrix_path
+        with open(dist_matrix_path, 'a') as f:
+            f.write(','.join(map(str, row)) + '\n')
 
     def distance_matrix_reference(self,
                                 reference_ids: list,
@@ -205,7 +203,7 @@ class similarity:
         total_jobs = int(len(self.ids) * (len(self.ids) - 1) / 2)
         self.progress = tqdm(total=total_jobs, desc="Calculating distance matrix")
         for i, id1 in enumerate(self.ids):
-            self._write_row(id1, self.ids[i+1:], dist_matrix_path, n_zero_distances=i+1)
+            self._write_row(i, dist_matrix_path, mirror=True)
 
             # save the matrix to a file if the interval is reached or if it is the last iteration
         self.progress.close()
@@ -265,7 +263,8 @@ class similarity:
         # get the ids so they can be used later, then drop them from the dataframe as we don't want to cluster on them
         self.ids = self.X['id']
         self.X.drop('id', axis=1, inplace=True)
-        
+        self.X = self.X.to_numpy()
+
         return self.X, self.ids
 
     def db_scan(self, eps=0.5, min_samples=5, na_mode='mean'):
