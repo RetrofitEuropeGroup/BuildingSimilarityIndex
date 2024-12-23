@@ -219,7 +219,7 @@ class similarity:
         if dist_matrix_path is not None:
             utils.save_matrix(mirrored_matrix, dist_matrix_path)
         if plot_matrix:
-            utils.plot_matrix(mirrored_matrix, self.ids)
+            utils.plot_matrix(mirrored_matrix)
         return mirrored_matrix
 
     def handle_na(self, na_mode='mean'):

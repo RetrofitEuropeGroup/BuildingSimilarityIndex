@@ -3,13 +3,22 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_matrix(matrix, formatted_ids, reference_ids=None):
+def plot_matrix(matrix, reference_ids=None):
+    if matrix.shape[0] > 100 or matrix.shape[1] > 100:
+        raise ValueError(f"Matrix is too large to plot, max 100 buildings allowed but matrix has shape: {matrix.shape}")
     if matrix.shape[0] != matrix.shape[1] and reference_ids is None:
         raise ValueError("Matrix is not square and is also not a reference matrix, cannot plot")
-    if len(formatted_ids) > 100 or (reference_ids is not None and len(reference_ids) > 100):
-        raise ValueError(f"Too many ids to plot, max 100 ids allowed: {len(formatted_ids)}, {len(reference_ids)}")
-    
-    plt.matplotlib.pyplot.matshow(matrix)
+    elif reference_ids is not None and len(reference_ids) != matrix.shape[0]:
+        raise ValueError(f"Reference ids length does not match matrix shape: {len(reference_ids)} != {matrix.shape[0]}")
+
+    if reference_ids is not None:
+        formatted_ids = format_ids(reference_ids)
+    else:
+        formatted_ids = format_ids(matrix[0, 1:])
+    distances = matrix[1:, 1:].astype(float)
+    plt.matplotlib.pyplot.matshow(distances)
+
+    # set the labels for the x and y axis, and the colorbar. finally show the plot 
     if reference_ids is not None:
         plt.xticks(range(len(reference_ids)), reference_ids, rotation=90)
         plt.ylabel("Reference IDs")
