@@ -191,8 +191,7 @@ def process_building(building,
                      density_2d,
                      density_3d,
                      vertices,
-                     custom_indices=None,
-                     verbose=False):
+                     custom_indices=None):
 
     if not filter is None and filter != obj:
         return obj, None
@@ -377,12 +376,10 @@ def calculate_metrics(input,
                                 density_2d,
                                 density_3d,
                                 vertices,
-                                indices_list,
-                                verbose)
+                                indices_list)
             futures.append(future)
 
         # wait for the jobs to finish and add the results to the stats
-        
         with tqdm(total=total_jobs, desc="Calculating the 2D & 3D metrics") as progress:
             stats = {}
             for future in as_completed(futures):
