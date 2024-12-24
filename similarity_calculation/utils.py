@@ -3,13 +3,22 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_matrix(matrix, formatted_ids, reference_ids=None):
+def plot_matrix(matrix, reference_ids=None):
+    if matrix.shape[0] > 100 or matrix.shape[1] > 100:
+        raise ValueError(f"Matrix is too large to plot, max 100 buildings allowed but matrix has shape: {matrix.shape}")
     if matrix.shape[0] != matrix.shape[1] and reference_ids is None:
         raise ValueError("Matrix is not square and is also not a reference matrix, cannot plot")
-    if len(formatted_ids) > 100 or (reference_ids is not None and len(reference_ids) > 100):
-        raise ValueError(f"Too many ids to plot, max 100 ids allowed: {len(formatted_ids)}, {len(reference_ids)}")
-    
-    plt.matplotlib.pyplot.matshow(matrix)
+    elif reference_ids is not None and len(reference_ids) != matrix.shape[0]:
+        raise ValueError(f"Reference ids length does not match matrix shape: {len(reference_ids)} != {matrix.shape[0]}")
+
+    if reference_ids is not None:
+        formatted_ids = format_ids(reference_ids)
+    else:
+        formatted_ids = format_ids(matrix[0, 1:])
+    distances = matrix[1:, 1:].astype(float)
+    plt.matplotlib.pyplot.matshow(distances)
+
+    # set the labels for the x and y axis, and the colorbar. finally show the plot 
     if reference_ids is not None:
         plt.xticks(range(len(reference_ids)), reference_ids, rotation=90)
         plt.ylabel("Reference IDs")
@@ -21,18 +30,18 @@ def plot_matrix(matrix, formatted_ids, reference_ids=None):
     plt.show()
 
 # function to calculate the distance matrix
-def mirror(matrix):
-    upper_tri = np.triu(matrix)
+def mirror(matrix: np.ndarray) -> np.ndarray:
+    # omit the first row and column (ids)
+    distances = matrix[1:, 1:].astype(float)
+    upper_tri = np.triu(distances)
     lower_tri = upper_tri.T
     mirrored_matrix = upper_tri + lower_tri
-    return mirrored_matrix
 
-def save_matrix(matrix, path, header, index):
-    if matrix.shape[0] == matrix.shape[1]:
-        matrix = mirror(matrix)
-    matrix_with_index = matrix.astype(str)
-    matrix_with_index = np.insert(matrix_with_index, 0, index, axis=1)
-    
+    # add the distances back into the matrix
+    matrix[1:, 1:] = mirrored_matrix
+    return matrix
+
+def save_matrix(matrix, path):
     # check if the path is in an existing directory
     parent_dir = os.path.dirname(path)
     if parent_dir == '':
@@ -40,12 +49,13 @@ def save_matrix(matrix, path, header, index):
     if os.path.isdir(parent_dir) == False:
         os.mkdir(parent_dir)
 
-    np.savetxt(path, matrix_with_index, delimiter=",", fmt="%s", header=header, comments='')
-    return matrix # we return the matrix without the index so it can be used for further calculations
+    np.savetxt(path, matrix, delimiter=",", fmt="%s", comments='')
 
 def check_csv(path):
     if isinstance(path, str) and path.endswith('.csv') == False:
         raise ValueError("the path must end with '.csv'")
+    if os.path.exists(path) and os.path.getsize(path) > 0:
+        raise ValueError(f"File already exists and is not empty: {path}")
     
 def format_ids(all_ids):
     formatted_ids = []

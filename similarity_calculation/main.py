@@ -123,39 +123,35 @@ class similarity:
         # if all good, return the ids
         return id1, id2
 
-    def _update_matrix(self, id1, other_ids, n_zero_distances=0):
-        # calculate the distance between the object and all other
-        row = np.array([0] * n_zero_distances)
-        for id2 in other_ids:
-            dist = self.calculate_distance(id1, id2)
-            row = np.append(row, round(dist, 5))
-
-        # update the matrix itself, else statement is only for the first row
-        if hasattr(self, 'matrix'):
-            self.matrix = np.vstack((self.matrix, row))
+    def _write_row(self, i: int, dist_matrix_path: str, mirror: bool):
+        """
+        Writes a row of distances to the distance matrix file.
+        Parameters:
+        i (int): Index of the object for which the distances are being calculated.
+        dist_matrix_path (str): Path to the file where the distance matrix is stored.
+        mirror (bool): If True, only calculates the distance above the diagonal, 
+                       assuming the ids on the x-axis and y-axis of the distance matrix are the same. 
+        Returns:
+        None
+        """
+        if mirror:
+            n_zero_distances = i + 1 # only calculate the distance above the diagonal
         else:
-            self.matrix = row
+            n_zero_distances = 0
+        id1 = self.ids[i]            
+        row = np.array([id1] + [0] * n_zero_distances)  # if mirror, fill the part below the diagonal with zeros, they will be filled later
         
-        self.progress.update(len(other_ids))
+        # calculate the distance between the object and all other
+        if n_zero_distances < len(self.ids):
+            other_objects = self.X[n_zero_distances:]
+            obj1 = self.X[i].reshape(1, -1)
+            distances = euclidean_distances(obj1, other_objects).round(5)
+            row = np.concatenate([row, distances[0]])
+            self.progress.update(len(other_objects))
 
-    def calculate_distance(self, id1, id2):
-        if hasattr(self, 'X') == False:
-            raise ValueError("The feature space data has not been prepared yet. Please run the set_X() function first.")
-        id1, id2 = self._check_ids(id1, id2)
-
-        # for obj2 consider the reference geopandas dataframe if it is given, otherwise use the original geopandas dataframe
-        obj1 = self.X.iloc[list(self.ids).index(id1)] # TODO: shouldn't we change self.ids to a list?
-        obj2 = self.X.iloc[list(self.ids).index(id2)]
-        obj1_fs = obj1[self.columns].array.reshape(1, -1)
-        obj2_fs = obj2[self.columns].array.reshape(1, -1)
-
-        # calculate the euclidean distance between the two objects
-        dist = euclidean_distances(obj1_fs, obj2_fs)
-        return dist[0][0]
-
-    def calculate_similarity(self, id1, id2):
-        dist = self.calculate_distance(id1, id2)
-        return 1 / (1 + dist)
+        # Write (only) the new row to dist_matrix_path
+        with open(dist_matrix_path, 'a') as f:
+            f.write(','.join(map(str, row)) + '\n')
 
     def distance_matrix_reference(self,
                                 reference_ids: list,
@@ -166,6 +162,7 @@ class similarity:
         are the objects that are compared to the reference objects. The y-axis objects
         are from the original geopandas dataframe, the x-axis objects are from the
         reference geopandas dataframe."""
+        raise NotImplementedError("This function is not implemented anymore")
 
         utils.check_csv(dist_matrix_path) # check if the path is a csv file
 
@@ -178,7 +175,7 @@ class similarity:
         # loop over all objects and calculate the distance to the reference objects
         self.progress = tqdm(total=len(regular_ids)*len(reference_ids), desc="Calculating distance matrix")
         for id1 in regular_ids:
-            self._update_matrix(id1, reference_ids)
+            self._write_row(id1, reference_ids)
             
             # save the matrix to a file if the interval is reached
             if isinstance(dist_matrix_path, str) and self.matrix.ndim > 1 and self.matrix.shape[0] % save_interval == 0:
@@ -194,32 +191,33 @@ class similarity:
             utils.plot_matrix(self.matrix, regular_ids, reference_ids)
         return self.matrix
 
-    def distance_matrix_regular(self, dist_matrix_path: str, save_interval: int = 100, plot_matrix: bool = False):
+    def distance_matrix_regular(self, dist_matrix_path: str, plot_matrix: bool = False):
         utils.check_csv(dist_matrix_path)
         
         # get all ids & prepare the data
         self.set_X()
-        header = 'id,' + ",".join(self.ids)
+        with open(dist_matrix_path, 'a') as f:
+            f.write('id,' + ",".join(self.ids) + '\n')
 
         # calculate the distance between all objects
         total_jobs = int(len(self.ids) * (len(self.ids) - 1) / 2)
         self.progress = tqdm(total=total_jobs, desc="Calculating distance matrix")
         for i, id1 in enumerate(self.ids):
-            self._update_matrix(id1, self.ids[i+1:], n_zero_distances=i+1)
+            self._write_row(i, dist_matrix_path, mirror=True)
 
-            # save the matrix to a file if the interval is reached
-            if isinstance(dist_matrix_path, str) and self.matrix.ndim > 1 and self.matrix.shape[0] % save_interval == 0:
-                mirrored_matrix = utils.save_matrix(self.matrix, dist_matrix_path, header, index=self.ids[:i+1])
-                #TODO: just append the new rows to the file instead of saving the whole matrix
+            # save the matrix to a file if the interval is reached or if it is the last iteration
         self.progress.close()
         
         # make sure the full matrix is saved
-        mirrored_matrix = utils.save_matrix(self.matrix, dist_matrix_path, header, index=self.ids)
         if self.verbose:
-            print(f'INFO: Regular distance matrix calculated and saved to "{dist_matrix_path}"')
+            print(f'INFO: Finished calculating Regular distance matrix calculated and saved to "{dist_matrix_path}"')
         
+        matrix = np.loadtxt(dist_matrix_path, delimiter=',', dtype=str)
+        mirrored_matrix = utils.mirror(matrix)
+        if dist_matrix_path is not None:
+            utils.save_matrix(mirrored_matrix, dist_matrix_path)
         if plot_matrix:
-            utils.plot_matrix(mirrored_matrix, self.ids)
+            utils.plot_matrix(mirrored_matrix)
         return mirrored_matrix
 
     def handle_na(self, na_mode='mean'):
@@ -265,7 +263,8 @@ class similarity:
         # get the ids so they can be used later, then drop them from the dataframe as we don't want to cluster on them
         self.ids = self.X['id']
         self.X.drop('id', axis=1, inplace=True)
-        
+        self.X = self.X.to_numpy()
+
         return self.X, self.ids
 
     def db_scan(self, eps=0.5, min_samples=5, na_mode='mean'):
