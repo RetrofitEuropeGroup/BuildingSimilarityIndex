@@ -191,7 +191,7 @@ class similarity:
             utils.plot_matrix(self.matrix, regular_ids, reference_ids)
         return self.matrix
 
-    def distance_matrix_regular(self, dist_matrix_path: str, plot_matrix: bool = False):
+    def distance_matrix_regular(self, dist_matrix_path: str, mirror: bool = False, plot_matrix: bool = False):
         utils.check_csv(dist_matrix_path)
         
         # get all ids & prepare the data
@@ -202,8 +202,8 @@ class similarity:
         # calculate the distance between all objects
         total_jobs = int(len(self.ids) * (len(self.ids) - 1) / 2)
         self.progress = tqdm(total=total_jobs, desc="Calculating distance matrix")
-        for i, id1 in enumerate(self.ids):
-            self._write_row(i, dist_matrix_path, mirror=True)
+        for i in range(len(self.ids)):
+            self._write_row(i, dist_matrix_path, mirror=mirror)
 
             # save the matrix to a file if the interval is reached or if it is the last iteration
         self.progress.close()
