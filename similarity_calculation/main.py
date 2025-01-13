@@ -110,19 +110,16 @@ class similarity:
         return weighted_df
 
     ## main functions
-    # function to calculate the distance between two objects
-    def _check_ids(self, id1, id2):
-        # check if the ids are in the dataframe
-        if id1 not in self.ids.values:
-            raise ValueError(f"id1 {id1} not found in the dataframe")
+    def _write_row_reference(self, i: int, dist_matrix_path: str):
+        obj1 = self.X[i].reshape(1, -1)
+        distances = euclidean_distances(obj1, self.reference_objects).round(5)[0]
+        self.progress.update(len(self.reference_ids))
+        row = self.ids[i] + ',' + ','.join(map(str, distances)) + '\n'
 
-        # consider the reference dataframe if it is given, don't look at the original geopandas dataframe
-        if id2 not in self.ids.values:
-            raise ValueError(f"id2 ({id2}) not found in the geopandas dataframe")
-
-        # if all good, return the ids
-        return id1, id2
-
+        # Write (only) the new row to dist_matrix_path
+        with open(dist_matrix_path, 'a') as f:
+            f.write(row)
+    
     def _write_row(self, i: int, dist_matrix_path: str, mirror: bool):
         """
         Writes a row of distances to the distance matrix file.
@@ -138,8 +135,7 @@ class similarity:
             n_zero_distances = i + 1 # only calculate the distance above the diagonal
         else:
             n_zero_distances = 0
-        id1 = self.ids[i]            
-        row = np.array([id1] + [0] * n_zero_distances)  # if mirror, fill the part below the diagonal with zeros, they will be filled later
+        row = np.array([self.ids[i]] + [0] * n_zero_distances)  # if mirror, fill the part below the diagonal with zeros, they will be filled later
         
         # calculate the distance between the object and all other
         if n_zero_distances < len(self.ids):
@@ -156,69 +152,74 @@ class similarity:
     def distance_matrix_reference(self,
                                 reference_ids: list,
                                 dist_matrix_path: str,
-                                save_interval: int = 100,
                                 plot_matrix: bool = False):
         """ a distance matrix, but the x-axis are reference objects and the y-axis 
         are the objects that are compared to the reference objects. The y-axis objects
         are from the original geopandas dataframe, the x-axis objects are from the
         reference geopandas dataframe."""
-        raise NotImplementedError("This function is not implemented anymore")
-
         utils.check_csv(dist_matrix_path) # check if the path is a csv file
 
-        # get all ids & prepare the data
+        # prepare the data & set the reference / regular ids, also preload the reference objects to avoid repetitive loading
         self.set_X()
-        reference_ids = utils.format_ids(reference_ids)
-        regular_ids = self.ids[~self.ids.isin(reference_ids)] # remove the reference ids from the regular ids
-        header = 'id,' + ",".join(reference_ids)
+        self.reference_ids = utils.format_ids(reference_ids)
+        self.regular_ids = self.ids[~self.ids.isin(reference_ids)]
+        self.reference_objects = self.X[self.ids.isin(reference_ids)]
+        with open(dist_matrix_path, 'w') as f:
+            f.write('id,' + ",".join(self.reference_ids) + '\n')
 
         # loop over all objects and calculate the distance to the reference objects
-        self.progress = tqdm(total=len(regular_ids)*len(reference_ids), desc="Calculating distance matrix")
-        for id1 in regular_ids:
-            self._write_row(id1, reference_ids)
-            
-            # save the matrix to a file if the interval is reached
-            if isinstance(dist_matrix_path, str) and self.matrix.ndim > 1 and self.matrix.shape[0] % save_interval == 0:
-                utils.save_matrix(self.matrix, dist_matrix_path, header, index=regular_ids)
+        self.progress = tqdm(total=len(self.regular_ids)*len(self.reference_ids), desc="Calculating distance matrix")
+        for i, id1 in enumerate(self.ids):
+            if id1 in self.regular_ids.values:
+                self._write_row_reference(i, dist_matrix_path)
         self.progress.close()
 
-        # make sure the full matrix is saved, or just return the matrix
-        utils.save_matrix(self.matrix, dist_matrix_path, header, index=regular_ids)
         if self.verbose:
-            print(f'Distance matrix calculated and saved to "{dist_matrix_path}"')
+            print(f'INFO: Finished calculating reference distance matrix and saved to "{dist_matrix_path}"')
 
-        if plot_matrix:
-            utils.plot_matrix(self.matrix, regular_ids, reference_ids)
-        return self.matrix
+        if plot_matrix and (len(self.regular_ids) > 50 or len(self.reference_ids) > 50):
+            raise ValueError("Matrix is too large to plot, max 50 buildings allowed per side but matrix has shape: {}x{}".format(len(self.regular_ids), len(self.reference_ids)))
+        elif plot_matrix:
+            matrix = np.loadtxt(dist_matrix_path, delimiter=',', dtype=str)
+            utils.plot_matrix(matrix, reference_ids=self.reference_ids)
 
     def distance_matrix_regular(self, dist_matrix_path: str, mirror: bool = False, plot_matrix: bool = False):
         utils.check_csv(dist_matrix_path)
         
         # get all ids & prepare the data
         self.set_X()
-        with open(dist_matrix_path, 'a') as f:
+        if mirror and len(self.ids) > 10000:
+            print("WARNING: your distance matrix is very large ({} rows), it might take too much time to mirror the matrix. Consider setting mirror to False.".format(len(self.ids)))
+        with open(dist_matrix_path, 'w') as f:
             f.write('id,' + ",".join(self.ids) + '\n')
-
-        # calculate the distance between all objects
-        total_jobs = int(len(self.ids) * (len(self.ids) - 1) / 2)
+        
+        # add progress bar
+        total_jobs = len(self.ids) * (len(self.ids) - 1)
+        if mirror:
+            total_jobs = int(total_jobs / 2)            
         self.progress = tqdm(total=total_jobs, desc="Calculating distance matrix")
+        # calculate the distance between all objects
         for i in range(len(self.ids)):
             self._write_row(i, dist_matrix_path, mirror=mirror)
-
-            # save the matrix to a file if the interval is reached or if it is the last iteration
         self.progress.close()
         
         # make sure the full matrix is saved
         if self.verbose:
-            print(f'INFO: Finished calculating Regular distance matrix calculated and saved to "{dist_matrix_path}"')
+            print(f'INFO: Finished calculating regular distance matrix and saved to "{dist_matrix_path}"')
         
-        matrix = np.loadtxt(dist_matrix_path, delimiter=',', dtype=str)
-        mirrored_matrix = utils.mirror(matrix)
-        if dist_matrix_path is not None:
-            utils.save_matrix(mirrored_matrix, dist_matrix_path)
-        if plot_matrix:
-            utils.plot_matrix(mirrored_matrix)
-        return mirrored_matrix
+        matrix = None
+        if mirror:
+            matrix = np.loadtxt(dist_matrix_path, delimiter=',', dtype=str)
+            matrix = utils.mirror(matrix)
+            utils.save_matrix(matrix, dist_matrix_path)
+        # plot if needed
+        if plot_matrix and len(self.ids) > 50:
+            raise ValueError("Matrix is too large to plot, max 50 buildings allowed but matrix has {} buildings".format(len(self.ids)))
+        elif plot_matrix:
+            if matrix is None:
+                matrix = np.loadtxt(dist_matrix_path, delimiter=',', dtype=str)
+            utils.plot_matrix(matrix)
+
 
     def handle_na(self, na_mode='mean'):
         if na_mode == 'drop':

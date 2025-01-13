@@ -7,22 +7,21 @@ def plot_matrix(matrix, reference_ids=None):
     if matrix.shape[0] > 100 or matrix.shape[1] > 100:
         raise ValueError(f"Matrix is too large to plot, max 100 buildings allowed but matrix has shape: {matrix.shape}")
     if matrix.shape[0] != matrix.shape[1] and reference_ids is None:
-        raise ValueError("Matrix is not square and is also not a reference matrix, cannot plot")
-    elif reference_ids is not None and len(reference_ids) != matrix.shape[0]:
+        raise ValueError("Matrix is not square ({}x{}) and is also not a reference matrix, cannot plot".format(matrix.shape[0], matrix.shape[1]))
+    elif reference_ids is not None and len(reference_ids) != matrix.shape[1] - 1:
         raise ValueError(f"Reference ids length does not match matrix shape: {len(reference_ids)} != {matrix.shape[0]}")
 
     if reference_ids is not None:
-        formatted_ids = format_ids(reference_ids)
-    else:
-        formatted_ids = format_ids(matrix[0, 1:])
+        reference_ids = format_ids(reference_ids)
+    formatted_ids = format_ids(matrix[1:, 0])
     distances = matrix[1:, 1:].astype(float)
     plt.matplotlib.pyplot.matshow(distances)
 
     # set the labels for the x and y axis, and the colorbar. finally show the plot 
     if reference_ids is not None:
         plt.xticks(range(len(reference_ids)), reference_ids, rotation=90)
-        plt.ylabel("Reference IDs")
-        plt.xlabel("Other IDs")
+        plt.xlabel("Reference IDs")
+        plt.ylabel("Other IDs")
     else:
         plt.xticks(range(len(formatted_ids)), formatted_ids, rotation=90)
     plt.yticks(range(len(formatted_ids)), formatted_ids)
@@ -41,17 +40,24 @@ def mirror(matrix: np.ndarray) -> np.ndarray:
     matrix[1:, 1:] = mirrored_matrix
     return matrix
 
-def save_matrix(matrix, path):
-    # check if the path is in an existing directory
+def create_parent_dir(path):
     parent_dir = os.path.dirname(path)
     if parent_dir == '':
         parent_dir = '.'
-    if os.path.isdir(parent_dir) == False:
+    if os.path.exists(parent_dir) == False:
         os.mkdir(parent_dir)
+    elif os.path.isdir(parent_dir) == False:
+        raise Exception(f"Parent of {path} already exists and is not a directory")
 
+def save_matrix(matrix, path):
+    # check if the path is in an existing directory
+    create_parent_dir(path)
     np.savetxt(path, matrix, delimiter=",", fmt="%s", comments='')
 
 def check_csv(path):
+    if not isinstance(path, str):
+        raise TypeError(f"Path has type {type(path)}, should be str")
+    create_parent_dir(path)
     if isinstance(path, str) and path.endswith('.csv') == False:
         raise ValueError("the path must end with '.csv'")
     if os.path.exists(path) and os.path.getsize(path) > 0:
