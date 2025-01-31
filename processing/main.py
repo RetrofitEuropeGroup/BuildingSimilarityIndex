@@ -67,10 +67,12 @@ class processing():
                 feature_space_merged[col] = feature_space_merged[col].astype(int)
         return feature_space_merged
 
-    def run(self):
+    def run(self, exists_ok=False):
         # merge if a folder has been provided
         if len(os.listdir(self._bag_data_folder)) == 0:
             raise Exception("The bag_data_folder is empty, please provide a folder with cityjson files")
+        if exists_ok == False and os.path.exists(self.feature_space_file):
+            raise FileExistsError("Feature space file already exists")
         self._merge_files()
 
         # calculate the 2d / 3d metrics and turning function features
