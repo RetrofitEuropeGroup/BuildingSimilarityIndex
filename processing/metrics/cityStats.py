@@ -203,7 +203,8 @@ def process_building(building,
     # Skip if no geometry
     if not "geometry" in building or len(building["geometry"]) == 0:
         return obj, None
-
+    if len(building["geometry"]) < 3:
+        return obj, None
     geom = building["geometry"][2]
 
     mesh = cityjson.to_polydata(geom, vertices).clean()
