@@ -94,26 +94,31 @@ def main_tilessqlite(data_folder, file_path_bag, verbose=False):
 
         for tile in tiles['features']:
             tile_3dbag_cj = download_3dbag_cj(data_folder, tile['properties']['cj_download'])
-
+            print("hello")
             for pand_id in tile_3dbag_cj['CityObjects'].keys():
                 if '-' in pand_id:
                     continue
+
                 bag_data = query_bag(cursor_bag, pand_id[14:], columns=bag_columns)
                 if bag_data is None:
                     print(f"No pand with id '{pand_id}' in BAG.gpkg")
                     continue
                 bag_data = {bag_columns[i]:bag_data[i] for i in range(len(bag_columns))}
                 
-                if bag_data['gebruiksdoel'] != "woonfunctie":
+                if bag_data.get('gebruiksdoel') != "woonfunctie":
                     continue
-                
-                roofmetrics = get_roof_attributes(pand_id, tile_3dbag_cj)
-                # if roofmetrics is not None:
-                print(roofmetrics)
-                break
+
+                parent_cj = tile_3dbag_cj.get("CityObjects").get(pand_id)
+                children = parent_cj.get("children")
+                childs_cj = {child: tile_3dbag_cj.get("CityObjects").get(child) for child in children}
+                roofmetrics = get_roof_attributes(bagid=pand_id, 
+                                                  parent_cj=parent_cj, 
+                                                  childs_cj=childs_cj, 
+                                                  vertices=tile_3dbag_cj.get("vertices"), 
+                                                  cj_scale=tile_3dbag_cj.get("transform").get("scale"),
+                                                  verbose=verbose)
+
                 # cityjson = make_cityjson(tile_3dbag_cj, bag_data, pand_id)
-                # print(cityjson)
-                print(pand_id)
             # Combineer in .city.json import function
             # Citystats import funciton
             # Voeg toe aan feature space ez?
@@ -121,7 +126,6 @@ def main_tilessqlite(data_folder, file_path_bag, verbose=False):
             if verbose:
                 tile_name = tile['properties']['cj_download'].split("/")[-1].split(".")[0]
                 print(f"Completed tile: {tile_name}")
-                break
         return
     
     finally:

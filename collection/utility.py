@@ -1,100 +1,116 @@
 import json
 import geopandas as gpd
 import geojson
-import aiohttp
+import math
 import requests
 
 
 
-def _roofmetrics(bagid=None, bbox=None, verbose=False):
-    """
-    Function to get roof metrics from 3dbag API
-    :param bagid: BAG id of the building
-    :param bbox: Bounding box of the building in the form of 'minx,miny,maxx,maxy'
-    :return: dictionary with roof metrics
-    """
-    if isinstance(bagid, str) and bagid.startswith("NL.IMBAG.Pand.") == False:
-        bagid = "NL.IMBAG.Pand." + bagid
-    if not bagid or not bbox:
-        bagid = 'NL.IMBAG.Pand.0321100000002220'
-        bbox = "138467.57,449429.21,138521.21,449474.03"
-        print('No BAG id or bounding box provided, using default values')
-        verbose = True
+def _face_area(face_coords: list, vertices: list, scale: list) -> float:
+    n = len(face_coords)
+    if n < 3:
+        return 0.0
+
+    # Shoelace formula
+    area = 0.0
+    for i in range(n):
+        v1 = vertices[face_coords[i]]
+        v2 = vertices[face_coords[(i + 1) % n]]
+        area += v1[0] * v2[1] - v2[0] * v1[1]
+
+    return abs(area) * 0.5 * (scale[0] * scale[1])
+
+
+def _total_area(face_coords: list, vertices: list, scale: list) -> float:
+    circumference_area = _face_area(face_coords[0], vertices, scale)
+    holes_area = sum(_face_area(hole, vertices, scale) for hole in face_coords[1:])
+    # TODO: check holes
+    return circumference_area-holes_area
+
+
+def get_roof_attributes(
+        bagid: str, 
+        parent_cj: dict, 
+        childs_cj: dict, 
+        vertices: list,
+        cj_scale: list, 
+        verbose: bool = False
+    ):
     
-    # params=dict(
-    #         service="WFS",
-    #         version="2.0.0",
-    #         request="GetFeature",
-    #         typeName="BAG3D:lod22",
-    #         outputFormat="json",
-    #         BBOX=bbox,
-    #     )
+    # Template by Claude
+    roof_parts = []
+    for child_id in parent_cj["children"]:
+        for geom in childs_cj[child_id]["geometry"]:
+            if geom["lod"] != "2.2":
+                continue
+            # if not geom["semantics"]:   # TODO: rm if unn
+            #     continue
+
+            surfaces = geom.get("semantics").get("surfaces")
+            values = geom.get("semantics").get("values")
+
+            if not (geom.get("type") == "Solid"):
+                if verbose:
+                    print(f"Geometry is not Solid. It's: {geom.get('type')}.")
+                continue
+            
+            for i, boundary_group in enumerate(geom.get("boundaries")):
+                bound_group_values = values[i]
+                for j, boundary_points in enumerate(boundary_group):
+                    boundary_value = bound_group_values[j]
+
+                    boundary_sem = surfaces[boundary_value]
+                    if not boundary_sem.get("type") == "RoofSurface":
+                        continue
+
+                    boundary_2d_area = _total_area(boundary_points, vertices, cj_scale)
+
+                    # TODO: 3d area
+                    # if use_3d_area and surf_sem.get("b3_hellingshoek") is not None:
+                    #     slope_rad = math.radians(surf_sem["b3_hellingshoek"])
+                    #     cos_val = math.cos(slope_rad)
+                    #     area = area_2d / cos_val if cos_val > 1e-6 else area_2d
+                    # else:
+                    #     area = area_2d
+                    area = boundary_2d_area
+
+                    roof_att = boundary_sem.update({"area": area})
+                    roof_parts.append(boundary_sem)
+
+    pand_max_height = max(part["b3_h_dak_max"] for part in roof_parts)
     
-    params = dict(
-    service="WFS",
-    version="2.0.0",
-    request="GetFeature", 
-    # typeName="BAG3D:lod22",
-    typeName="BAG3D:tiles",
-    outputFormat="json",
-    BBOX="204085.226,325278.304,204209.867,325402.946",  # Rounded + CRS
-    )
+    # Main roof (mr) and other roof (other) parts
+    mr_no_parts = 0
+    mr_area = 0.0
+    other_no_parts = 0
+    other_area = 0.0
 
-    url = "https://data.3dbag.nl/api/BAG3D/wfs"
-    r = requests.get(url, params=params)
-    # r.raise_for_status() #TODO: Maybe?
-    r = r.content
-    
+    for part in roof_parts:
+        if (part["b3_h_dak_max"] > pand_max_height - 1.0) or (part["area"] > 50.0):
+            mr_no_parts += 1
+            mr_area += part["area"]
+        else:
+            other_no_parts += 1
+            other_area += part["area"]
 
-    # Create GeoDataFrame from geojson and set coordinate reference system
-    json_content = geojson.loads(r)
-    if json_content.get('bbox') is None:
-        return None
-    data = gpd.GeoDataFrame.from_features(json_content, crs="EPSG:7415")
-    data = data[data['identificatie'] == bagid]
-
-    # calculate max height of the roofparts
-    maxheight = data['b3_h_max'].max()
-    # filter roofparts that are within 1m of the max height
-    data['main_roof'] = data['b3_h_max'] > maxheight - 1
-    # for all currently false roofparts, make true if geometry has area larger than 50m2
-    data['main_roof'] = data['main_roof'] | (data['geometry'].area > 50)
-
-    # TODO: horizontal roof angle not available in 3dbag data, so we cannot use 3d roof area yet. Using a proxy based on b3_opp_grond, b3_opp_dak_schuin and b3_opp_dak_plat
-    # data['3d_area'] = data['geometry'].area / math.cos(data['b3_hellingshoek'])
-
-    # calculate metrics:
-    mr_no_parts = data['main_roof'].sum()
-    mr_area = data[data['main_roof']]['geometry'].area.sum()
-
-    other_no_parts = len(data) - mr_no_parts
-    other_area = data[~data['main_roof']]['geometry'].area.sum()
-
-    if mr_no_parts + other_no_parts == 0:
-        part_ratio = None
-    else:
-        part_ratio = mr_no_parts / (mr_no_parts + other_no_parts)
-    if mr_area + other_area == 0:
-        area_ratio = None
-    else:
-        area_ratio = mr_area / (mr_area + other_area)
+    part_ratio = mr_no_parts / (mr_no_parts + other_no_parts)
+    area_ratio = mr_area / (mr_area + other_area)        
 
     if verbose:
         print(f'Building: {bagid}')
-        print(f'Main roof: {mr_no_parts} parts with a total area of {mr_area:.2f} m2')
-        print(f'Other roof: {other_no_parts} parts with a total area of {other_area:.2f} m2')
+        print(f'Main roof: {mr_no_parts} parts with a total area of {mr_area:.2f} m^2')
+        print(f'Other roof: {other_no_parts} parts with a total area of {other_area:.2f} m^2')
         print(f'Part ratio: {part_ratio:.2f}')
         print(f'Area ratio: {area_ratio:.2f}')
-
+    
     return dict(
-        main_roof_parts=int(mr_no_parts), # convert to int for json serialisation
+        main_roof_parts=int(mr_no_parts),
         main_roof_area=mr_area,
         other_roof_parts=int(other_no_parts),
         other_roof_area=other_area,
         part_ratio=part_ratio,
         area_ratio=area_ratio
     )
-
 
 
 def convert_to_cityjson(data: dict, bag_attributes: dict, roof_attributes: dict, id: str):
@@ -111,74 +127,3 @@ def convert_to_cityjson(data: dict, bag_attributes: dict, roof_attributes: dict,
         cityjson['CityObjects'][f"NL.IMBAG.Pand.{id}"]['attributes'][var] = attributes.get(var)
     return cityjson
 
-
-def get_bbox(data: dict, decimals=5):
-    """Get the bounding box of a building from the 3D-BAG API."""
-    translate = data['transform']['translate']
-    centroid_x, centroid_y = translate[0], translate[1]
-    # perimeter = 10
-    perimeter = translate[2]
-    return f"""{round(centroid_x-perimeter, decimals)},
-               {round(centroid_y-perimeter, decimals)},
-               {round(centroid_x+perimeter, decimals)},
-               {round(centroid_y+perimeter, decimals)}"""
-
-def get_roof_attributes(id: str, data: dict):
-    bbox = get_bbox(data)
-    return _roofmetrics(id, bbox)
-
-def make_cityjson(data_3dbag, data_bag, pand_id):
-    roof_attributes = get_roof_attributes(pand_id, data_3dbag)
-    cityjson = convert_to_cityjson(data_3dbag, data_bag, roof_attributes)
-    return cityjson
-
-
-def convert_polygon_to_cityjson():
-
-    gdf = gpd.read_file(r'/home/nisfernos/Downloads/9-328-624.gpkg')
-
-    gdf_polys = gdf[gdf.geometry.geom_type == "MultiPolygon"]
-    print(gdf_polys)
-    geom_type, coords, offsets = shapely.to_ragged_array(gdf_polys.geometry, include_z=True)
-    print(geom_type)
-    print(coords)
-    print(offsets)
-
-
-    cityjson = CITYJSON_TEMPLATE.copy()
-    cityjson["vertices"] = coords.tolist()
-
-    rings, polys, geoms = offsets
-
-    for i, (idx, feature) in enumerate(gdf_polys.iterrows()):
-        cityobject_id = str(idx)
-
-        boundaries = []
-        for poly in range(geoms[i], geoms[i+1] if (i + 1) < len(geoms) else len(geoms) - 1):
-            ring_list = []
-            for ring in range(polys[poly], polys[poly + 1] if (poly + 1) < len(polys) else len(rings) - 1):
-                ring_list.append(
-                    [j for j in range(rings[ring], rings[ring + 1] if (ring + 1) < len(rings) else len(coords) - 1)][::-1]
-                )
-            boundaries.append(ring_list)
-
-        attributes = {
-            k: str(feature[k])
-            for k in feature.keys()
-            if k != "geometry"
-        }
-
-        cityjson["CityObjects"][cityobject_id] = {
-            "type": "Building",
-            "attributes": attributes,
-            "geometry": [
-                {
-                    "type": "MultiSurface",
-                    "boundaries": boundaries
-                }
-            ]
-        }
-
-
-# if __name__ == "__main__":
-#     pass
