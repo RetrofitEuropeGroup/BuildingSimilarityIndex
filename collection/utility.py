@@ -22,10 +22,9 @@ def _face_area(face_coords: list, vertices: list, scale: list) -> float:
 
 
 def _total_area(face_coords: list, vertices: list, scale: list) -> float:
-    circumference_area = _face_area(face_coords[0], vertices, scale)
-    holes_area = sum(_face_area(hole, vertices, scale) for hole in face_coords[1:])
-    # TODO: check holes
-    return circumference_area-holes_area
+    exterior_area = _face_area(face_coords[0], vertices, scale)
+    interior_area = sum(_face_area(hole, vertices, scale) for hole in face_coords[1:]) # Holes
+    return exterior_area - interior_area
 
 
 def get_roof_attributes(
@@ -35,7 +34,7 @@ def get_roof_attributes(
         vertices: list,
         cj_scale: list, 
         verbose: bool = False
-    ):
+    ) -> dict:
     
     # Template by Claude
     roof_parts = []
@@ -49,6 +48,7 @@ def get_roof_attributes(
             surfaces = geom.get("semantics").get("surfaces")
             values = geom.get("semantics").get("values")
 
+            # TODO: Add other geometry types
             if not (geom.get("type") == "Solid"):
                 if verbose:
                     print(f"Geometry is not Solid. It's: {geom.get('type')}.")
@@ -74,7 +74,7 @@ def get_roof_attributes(
                     #     area = area_2d
                     area = boundary_2d_area
 
-                    roof_att = boundary_sem.update({"area": area})
+                    boundary_sem.update({"area": area})
                     roof_parts.append(boundary_sem)
 
     pand_max_height = max(part["b3_h_dak_max"] for part in roof_parts)
@@ -111,19 +111,3 @@ def get_roof_attributes(
         part_ratio=part_ratio,
         area_ratio=area_ratio
     )
-
-
-def convert_to_cityjson(data: dict, bag_attributes: dict, roof_attributes: dict, id: str):
-    """Converts the data (that is collected with the API request) to CityJSON format."""
-    # create the cityjson object
-    cityjson = data['metadata']
-    cityjson['CityObjects'] = data['feature']['CityObjects']
-    cityjson['vertices'] = data['feature']['vertices']
-
-    # add the attributes to the cityjson object
-    all_variables = ['totaal_oppervlakte', 'aantal_verblijfsobjecten', 'gebruiksdoelen', 'main_roof_parts', 'main_roof_area', 'other_roof_parts', 'other_roof_area', 'part_ratio', 'area_ratio']
-    attributes = {**bag_attributes, **roof_attributes}
-    for var in all_variables:
-        cityjson['CityObjects'][f"NL.IMBAG.Pand.{id}"]['attributes'][var] = attributes.get(var)
-    return cityjson
-
