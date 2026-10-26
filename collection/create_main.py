@@ -49,14 +49,20 @@ def get_tiles(data_folder, verbose=False):
         return(tiles)
 
 
-def download_3dbag_cj(data_folder, tilefile, verbose=False):
+def download_3dbag_cj(data_folder, tilefile, error_3dbag=False, verbose=False):
     tiles_folder = os.path.join(data_folder, "tiles")
     if not os.path.exists(tiles_folder):
         os.mkdir(tiles_folder)
 
     tile_cjz_response = requests.get(f"{tilefile}")
+    if verbose:
+        print(tile_cjz_response.status_code)
+
     # Decompress response and load it into a zip file
-    tile_cj = json.loads(gzip.decompress(tile_cjz_response.content))
+    if not error_3dbag:
+        tile_cj = json.loads(gzip.decompress(tile_cjz_response.content))
+    else:
+        tile_cj = json.loads(tile_cjz_response.content)
 
     return tile_cj
 
@@ -103,7 +109,7 @@ def connect_gpkg(file_path):
     return conn
 
 
-def main_tilessqlite(data_folder, file_path_bag, verbose=False):
+def main_tilessqlite(data_folder, file_path_bag, error_3dbag=False, verbose=False):
     if not os.path.exists(os.path.join(data_folder, "tiles")):
         os.mkdir(os.path.join(data_folder, "tiles"))
 
@@ -115,9 +121,13 @@ def main_tilessqlite(data_folder, file_path_bag, verbose=False):
         bag_columns = ["identificatie", "gebruiksdoel", "aantal_verblijfsobjecten", "oppervlakte_min", "oppervlakte_max"]
 
         for tile in tiles['features']:
-            tile_3dbag_cj = download_3dbag_cj(data_folder, tile['properties']['cj_download'])
+            tile_cj_url = tile['properties']['cj_download']
+            if error_3dbag:
+                tile_cj_url = tile['properties']['cj_download'].replace("https://data.3dbag.nl", "https://3dbag.fsn1.your-objectstorage.com")
+            tile_3dbag_cj = download_3dbag_cj(data_folder, tile_cj_url, error_3dbag, verbose=verbose)
 
             for pand_id in tile_3dbag_cj['CityObjects'].keys():
+                # If child (or buildingpart)
                 if '-' in pand_id:
                     continue
                 if tile_3dbag_cj['CityObjects'][pand_id]['attributes']['status'] != "Pand in gebruik":
@@ -127,9 +137,9 @@ def main_tilessqlite(data_folder, file_path_bag, verbose=False):
                 if bag_data is None:
                     print(f"No pand with id '{pand_id}' in BAG.gpkg")
                     continue
-                bag_attributes = {bag_columns[i]:bag_data[i] for i in range(len(bag_columns))}
+                bag_attributes = {bag_columns[i]:bag_data[i] for i in range(len(bag_columns)) if bag_columns[i] != 'identificatie'}
                 
-                if bag_data.get('gebruiksdoel') != "woonfunctie":
+                if bag_attributes.get('gebruiksdoel') != "woonfunctie":
                     continue
 
                 parent_cj = tile_3dbag_cj.get("CityObjects").get(pand_id)
@@ -162,6 +172,7 @@ def main_tilessqlite(data_folder, file_path_bag, verbose=False):
             if verbose:
                 tile_name = tile['properties']['cj_download'].split("/")[-1].split(".")[0]
                 print(f"Completed tile: {tile_name}")
+            break #TODO: rm
     
     finally:
         if conn_bag:
@@ -231,7 +242,7 @@ if __name__=="__main__":
     t0 = time.time()
 
     # main_api() # maar dubbele gebouwen? mss niet
-    main_tilessqlite(data_folder, gpkg_list[0], verbose=True) # Hoe geometry uit gpkg
+    main_tilessqlite(data_folder, gpkg_list[0], error_3dbag=True, verbose=True) # Hoe geometry uit gpkg
     # main_itsqlite(gpkg_list[0], gpkg_list[1], verbose=True)
 
     t1 = time.time()
