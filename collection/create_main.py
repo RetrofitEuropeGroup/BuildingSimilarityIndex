@@ -8,8 +8,7 @@ import requests
 import sqlite3
 import time
 
-from collection.utility import make_cityjson, get_roof_attributes
-from collection.WFS_roof import roofmetrics
+from collection.utility import get_roof_attributes
 
 
 
@@ -84,56 +83,6 @@ def query_bag(cursor_bag, pand_id:str, columns):
     return cursor_bag.fetchone()
 
 
-def main_tilessqlite(data_folder, file_path_bag, verbose=False):
-    conn_bag = connect_gpkg(file_path_bag)
-    cursor_bag = conn_bag.cursor()
-
-    try:
-        tiles = get_tiles(data_folder)
-        bag_columns = ["identificatie", "gebruiksdoel", "aantal_verblijfsobjecten", "oppervlakte_min", "oppervlakte_max"]
-
-        for tile in tiles['features']:
-            tile_3dbag_cj = download_3dbag_cj(data_folder, tile['properties']['cj_download'])
-            print("hello")
-            for pand_id in tile_3dbag_cj['CityObjects'].keys():
-                if '-' in pand_id:
-                    continue
-
-                bag_data = query_bag(cursor_bag, pand_id[14:], columns=bag_columns)
-                if bag_data is None:
-                    print(f"No pand with id '{pand_id}' in BAG.gpkg")
-                    continue
-                bag_data = {bag_columns[i]:bag_data[i] for i in range(len(bag_columns))}
-                
-                if bag_data.get('gebruiksdoel') != "woonfunctie":
-                    continue
-
-                parent_cj = tile_3dbag_cj.get("CityObjects").get(pand_id)
-                children = parent_cj.get("children")
-                childs_cj = {child: tile_3dbag_cj.get("CityObjects").get(child) for child in children}
-                roofmetrics = get_roof_attributes(bagid=pand_id, 
-                                                  parent_cj=parent_cj, 
-                                                  childs_cj=childs_cj, 
-                                                  vertices=tile_3dbag_cj.get("vertices"), 
-                                                  cj_scale=tile_3dbag_cj.get("transform").get("scale"),
-                                                  verbose=verbose)
-
-                # cityjson = make_cityjson(tile_3dbag_cj, bag_data, pand_id)
-            # Combineer in .city.json import function
-            # Citystats import funciton
-            # Voeg toe aan feature space ez?
-            # Delete file?
-            if verbose:
-                tile_name = tile['properties']['cj_download'].split("/")[-1].split(".")[0]
-                print(f"Completed tile: {tile_name}")
-        return
-    
-    finally:
-        if conn_bag:
-            cursor_bag.close()
-            conn_bag.close()
-
-
 def connect_gpkg(file_path):
     conn = sqlite3.connect(file_path)
     conn.enable_load_extension(True)
@@ -152,6 +101,74 @@ def connect_gpkg(file_path):
         print(f"Continuing will return in geometry being returned as BLOBS")
 
     return conn
+
+
+def main_tilessqlite(data_folder, file_path_bag, verbose=False):
+    if not os.path.exists(os.path.join(data_folder, "tiles")):
+        os.mkdir(os.path.join(data_folder, "tiles"))
+
+    conn_bag = connect_gpkg(file_path_bag)
+    cursor_bag = conn_bag.cursor()
+
+    try:
+        tiles = get_tiles(data_folder)
+        bag_columns = ["identificatie", "gebruiksdoel", "aantal_verblijfsobjecten", "oppervlakte_min", "oppervlakte_max"]
+
+        for tile in tiles['features']:
+            tile_3dbag_cj = download_3dbag_cj(data_folder, tile['properties']['cj_download'])
+
+            for pand_id in tile_3dbag_cj['CityObjects'].keys():
+                if '-' in pand_id:
+                    continue
+                if tile_3dbag_cj['CityObjects'][pand_id]['attributes']['status'] != "Pand in gebruik":
+                    continue
+
+                bag_data = query_bag(cursor_bag, pand_id[14:], columns=bag_columns)
+                if bag_data is None:
+                    print(f"No pand with id '{pand_id}' in BAG.gpkg")
+                    continue
+                bag_attributes = {bag_columns[i]:bag_data[i] for i in range(len(bag_columns))}
+                
+                if bag_data.get('gebruiksdoel') != "woonfunctie":
+                    continue
+
+                parent_cj = tile_3dbag_cj.get("CityObjects").get(pand_id)
+                children = parent_cj.get("children")
+                childs_cj = {child: tile_3dbag_cj.get("CityObjects").get(child) for child in children}
+                roof_attributes = get_roof_attributes(bagid=pand_id, 
+                                                  parent_cj=parent_cj, 
+                                                  childs_cj=childs_cj, 
+                                                  vertices=tile_3dbag_cj.get("vertices"), 
+                                                  cj_scale=tile_3dbag_cj.get("transform").get("scale"),
+                                                  verbose=verbose)
+                attributes = {**bag_attributes, **roof_attributes}
+                # check from here
+                # ['totaal_oppervlakte', 'aantal_verblijfsobjecten', 'gebruiksdoelen', 'main_roof_parts', 'main_roof_area', 'other_roof_parts', 'other_roof_area', 'part_ratio', 'area_ratio']
+                # See if it's all in there
+                # for key in attributes.keys():
+                parent_cj['attributes'].update(attributes)
+                # print(tile_3dbag_cj.get("CityObjects").get(pand_id).get('attributes'))
+
+            # Save file in data_folder/tiles/{tilenumber}.city.json
+            filename = tile['properties']['cj_download'].split("/")[-1][:-3]
+            with open(os.path.join(data_folder, "tiles", filename), 'w') as outfile:
+                json.dump(tile_3dbag_cj, outfile)
+            # Save file? or go immediately to feature space?
+
+            # Combineer in .city.json import function
+            # Citystats import funciton
+            # Voeg toe aan feature space ez?
+            # Delete file?
+            if verbose:
+                tile_name = tile['properties']['cj_download'].split("/")[-1].split(".")[0]
+                print(f"Completed tile: {tile_name}")
+    
+    finally:
+        if conn_bag:
+            cursor_bag.close()
+            conn_bag.close()
+
+    return
 
 
 def query_building_gpkg(cursor, id):
@@ -233,16 +250,6 @@ if __name__=="__main__":
             print(feature.identificatie)
             break
 
-    #### API call
-        headers = {'X-Api-Key':'l7de97bcf7acd3447ab2caf915655422db', 'Accept-Crs': 'EPSG:28992'}
-        url = 'https://api.bag.kadaster.nl/lvbag/individuelebevragingen/v2/adressenuitgebreid'
-        params = {'pandIdentificatie':'1667100000001458'}    
-        params = {'pandIdentificatie':'0003100000117485'}
-    
-        print(requests.get(url, params=params, headers=headers).json().get('_embedded', {}).get('adressen'))
-    
-        #### test gpkg head
-        print(load2gdf_slices(gpkg_list[1], chunk_size=10))
 
 [(1, b'GP\x00\x05\xf7\x1c\x00\x00\x00\x00\x00\x00p\xcb\x00A\x00\x00\x00\x00\xa0\xcb\x00A\x00\x00\x00\x00\xc0\x9c\x16A\x00\x00\x00\x00\xd8\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\xeb\x03\x00\x00\x01\x00\x00\x00#\x00\x00\x00\x00\x00\x00\x00\xa0\xcb\x00A\x00\x00\x00\x00\xcc\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xa0\x9f\xcb\x00A\x00\x00\x00@\xce\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00`\x9e\xcb\x00A\x00\x00\x00`\xd0\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00`\x9c\xcb\x00A\x00\x00\x00`\xd2\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xc0\x99\xcb\x00A\x00\x00\x00 \xd4\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x80\x96\xcb\x00A\x00\x00\x00\xa0\xd5\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xc0\x92\xcb\x00A\x00\x00\x00\xc0\xd6\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xa0\x8e\xcb\x00A\x00\x00\x00\x80\xd7\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00@\x8a\xcb\x00A\x00\x00\x00\x00\xd8\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xc0\x85\xcb\x00A\x00\x00\x00\x00\xd8\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00`\x81\xcb\x00A\x00\x00\x00\x80\xd7\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00@}\xcb\x00A\x00\x00\x00\xc0\xd6\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x80y\xcb\x00A\x00\x00\x00\xa0\xd5\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00@v\xcb\x00A\x00\x00\x00 \xd4\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xa0s\xcb\x00A\x00\x00\x00`\xd2\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xa0q\xcb\x00A\x00\x00\x00`\xd0\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00`p\xcb\x00A\x00\x00\x00@\xce\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00p\xcb\x00A\x00\x00\x00\x00\xcc\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00`p\xcb\x00A\x00\x00\x00\xc0\xc9\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xa0q\xcb\x00A\x00\x00\x00\xa0\xc7\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xa0s\xcb\x00A\x00\x00\x00\xc0\xc5\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00@v\xcb\x00A\x00\x00\x00\xe0\xc3\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x80y\xcb\x00A\x00\x00\x00`\xc2\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00@}\xcb\x00A\x00\x00\x00@\xc1\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00`\x81\xcb\x00A\x00\x00\x00\x80\xc0\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xc0\x85\xcb\x00A\x00\x00\x00\x00\xc0\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00@\x8a\xcb\x00A\x00\x00\x00\x00\xc0\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xa0\x8e\xcb\x00A\x00\x00\x00\x80\xc0\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xc0\x92\xcb\x00A\x00\x00\x00@\xc1\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x80\x96\xcb\x00A\x00\x00\x00`\xc2\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xc0\x99\xcb\x00A\x00\x00\x00\xe0\xc3\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00`\x9c\xcb\x00A\x00\x00\x00\xc0\xc5\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00`\x9e\xcb\x00A\x00\x00\x00\xa0\xc7\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xa0\x9f\xcb\x00A\x00\x00\x00\xc0\xc9\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xa0\xcb\x00A\x00\x00\x00\x00\xcc\x9c\x16A\x00\x00\x00\x00\x00\x00\x00\x00', 
   0.0, None, 'slanted', 'standard', 27.621999740600586, 128.3637237548828, 0, 0, 1, 0, 0, 1, 2, 0.0, 0.06930693238973618, 0.0, 0.0, 0.0, 0.0, 
