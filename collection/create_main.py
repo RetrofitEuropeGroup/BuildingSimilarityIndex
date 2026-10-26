@@ -109,7 +109,7 @@ def connect_gpkg(file_path):
     return conn
 
 
-def main_tilessqlite(data_folder, file_path_bag, error_3dbag=False, verbose=False):
+def main_tilessqlite(data_folder, file_path_bag, exists_ok=False, error_3dbag=False, verbose=False):
     if not os.path.exists(os.path.join(data_folder, "tiles")):
         os.mkdir(os.path.join(data_folder, "tiles"))
 
@@ -121,6 +121,13 @@ def main_tilessqlite(data_folder, file_path_bag, error_3dbag=False, verbose=Fals
         bag_columns = ["identificatie", "gebruiksdoel", "aantal_verblijfsobjecten", "oppervlakte_min", "oppervlakte_max"]
 
         for tile in tiles['features']:
+            tilename = tile['properties']['cj_download'].split("/")[-1][:-3]
+            # Als de JSON file al bestaat en exists_ok (False: vervang, True: sla over)
+            if not exists_ok and os.path.exists(data_folder, "tiles", tilename):
+                if verbose:
+                    print(f"CityJSON file '{tilename}' already exists.")
+                continue
+
             tile_cj_url = tile['properties']['cj_download']
             if error_3dbag:
                 tile_cj_url = tile['properties']['cj_download'].replace("https://data.3dbag.nl", "https://3dbag.fsn1.your-objectstorage.com")
@@ -131,7 +138,7 @@ def main_tilessqlite(data_folder, file_path_bag, error_3dbag=False, verbose=Fals
                 if '-' in pand_id:
                     continue
                 if tile_3dbag_cj['CityObjects'][pand_id]['attributes']['status'] != "Pand in gebruik":
-                    continue
+                    continue    # TODO: rm from cj
 
                 bag_data = query_bag(cursor_bag, pand_id[14:], columns=bag_columns)
                 if bag_data is None:
@@ -160,12 +167,10 @@ def main_tilessqlite(data_folder, file_path_bag, error_3dbag=False, verbose=Fals
                 # print(tile_3dbag_cj.get("CityObjects").get(pand_id).get('attributes'))
 
             # Save file in data_folder/tiles/{tilenumber}.city.json
-            filename = tile['properties']['cj_download'].split("/")[-1][:-3]
-            with open(os.path.join(data_folder, "tiles", filename), 'w') as outfile:
+            with open(os.path.join(data_folder, "tiles", tilename), 'w') as outfile:
                 json.dump(tile_3dbag_cj, outfile)
             # Save file? or go immediately to feature space?
 
-            # Combineer in .city.json import function
             # Citystats import funciton
             # Voeg toe aan feature space ez?
             # Delete file?
@@ -242,7 +247,7 @@ if __name__=="__main__":
     t0 = time.time()
 
     # main_api() # maar dubbele gebouwen? mss niet
-    main_tilessqlite(data_folder, gpkg_list[0], error_3dbag=True, verbose=True) # Hoe geometry uit gpkg
+    main_tilessqlite(data_folder, gpkg_list[0], error_3dbag=True, verbose=False) # Hoe geometry uit gpkg
     # main_itsqlite(gpkg_list[0], gpkg_list[1], verbose=True)
 
     t1 = time.time()
