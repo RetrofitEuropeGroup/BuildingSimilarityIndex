@@ -1,7 +1,6 @@
 import dotenv
 import json
 import os
-import time
 
 import flatgeobuf as fgb
 import gzip
@@ -86,7 +85,14 @@ def connect_gpkg(file_path):
     return conn
 
 
+def remove_building(tile_cj, pand_id):
+    pand_ids = [pand_id].append(tile_cj['CityObjects'].get('children'))
+    for id in pand_ids:
+        del tile_cj['CityObjects'][id]
+
+
 def main_tilessqlite(data_folder, file_path_bag, exists_ok=False, error_3dbag=False, verbose=False):
+    # TODO: add multiprocessing and/or async
     if not os.path.exists(os.path.join(data_folder, "tiles")):
         os.mkdir(os.path.join(data_folder, "tiles"))
 
@@ -115,15 +121,19 @@ def main_tilessqlite(data_folder, file_path_bag, exists_ok=False, error_3dbag=Fa
                 if '-' in pand_id:
                     continue
                 if tile_3dbag_cj['CityObjects'][pand_id]['attributes']['status'] != "Pand in gebruik":
-                    continue    # TODO: rm from cj
+                    remove_building(tile_3dbag_cj, pand_id)
+                    continue
 
                 bag_data = query_bag(cursor_bag, pand_id[14:], columns=bag_columns)
                 if bag_data is None:
-                    print(f"No pand with id '{pand_id}' in BAG.gpkg")
+                    remove_building(tile_3dbag_cj, pand_id)
+                    if verbose:
+                        print(f"No pand with id '{pand_id}' in BAG.gpkg (probably a historic building)")
                     continue
                 bag_attributes = {bag_columns[i]:bag_data[i] for i in range(len(bag_columns)) if bag_columns[i] != 'identificatie'}
                 
                 if bag_attributes.get('gebruiksdoel') != "woonfunctie":
+                    remove_building(tile_3dbag_cj, pand_id)
                     continue
 
                 parent_cj = tile_3dbag_cj.get("CityObjects").get(pand_id)
@@ -197,6 +207,7 @@ def main_itsqlite(file_path_bag, file_path_3dbag, verbose=False):
         conn_3dbag.close()
 
 
+# Add command line argurments
 if __name__=="__main__":
     dotenv.load_dotenv()
     gpkg_bag_light = os.environ.get('gpkg_bag_light')
