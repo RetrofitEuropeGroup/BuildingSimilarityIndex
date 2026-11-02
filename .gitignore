@@ -13,3 +13,4 @@ analysis/*
 !*.gitkeep
 /profiling
 */DataFormat.md
+test*.py
