@@ -3,6 +3,7 @@ import json
 import os
 
 import flatgeobuf as fgb
+# from flatgeobuf import load as fgbload
 import gzip
 import requests
 import sqlite3
@@ -193,9 +194,10 @@ def main_tilessqlite(data_folder, file_path_bag, exists_ok=False, error_3dbag=Fa
                 attributes = {**bag_attributes, **roof_attributes}
                 parent_cj['attributes'].update(attributes)
 
-            # Save file in data_folder/tiles/{tilenumber}.city.json
-            with open(os.path.join(data_folder, "tiles", tilename), 'w') as outfile:
-                json.dump(tile_3dbag_cj, outfile)
+            # Save file in data_folder/tiles/{tilenumber}.city.json if it contains objects in CityObjects
+            if tile_3dbag_cj['CityObjects']:
+                with open(os.path.join(data_folder, "tiles", tilename), 'w') as outfile:
+                    json.dump(tile_3dbag_cj, outfile)
 
             if verbose:
                 tile_name = tile['properties']['cj_download'].split("/")[-1].split(".")[0]
