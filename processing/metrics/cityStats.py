@@ -267,7 +267,7 @@ def process_building(building,
         "b3_bouwlagen": building['attributes']['b3_bouwlagen'],
         "b3_hellingshoek_proxy": round(b3_hellingshoek_proxy,2),
         "aantal_verblijfsobjecten": building['attributes'].get("aantal_verblijfsobjecten"),
-        "totaal_oppervlakte": building['attributes'].get("totaal_oppervlakte"),
+        # "totaal_oppervlakte": building['attributes'].get("totaal_oppervlakte"),
         "main_roof_parts": building['attributes'].get("main_roof_parts"),
         "main_roof_area": building['attributes'].get("main_roof_area"),
         "other_roof_parts": building['attributes'].get("other_roof_parts"),
@@ -277,6 +277,12 @@ def process_building(building,
         "hole_count": tri_mesh.n_open_edges,
         "geometry": shape,
     }
+    if building['attributes'].get("totaal_oppervlakte"):
+        values["totaal_oppervlakte"] = building['attributes'].get("totaal_oppervlakte")
+    else:
+        values["oppervlakte_min"] = building['attributes'].get("oppervlakte_min")
+        values["oppervlakte_max"] = building['attributes'].get("oppervlakte_max")
+
     purposes = building['attributes'].get("gebruiksdoelen")
     if purposes is not None:
         purposes = np.unique(purposes)
