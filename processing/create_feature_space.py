@@ -3,6 +3,7 @@ import json
 import os
 
 import pandas as pd
+import re
 from tqdm import tqdm
 
 from processing.metrics.cityStats import calculate_metrics
@@ -22,10 +23,10 @@ def _format_ids(cj_file):
     return formatted_ids
 
 
-def _create_feature_space(tile_data_file, formatted_ids, output_file_path, verbose=False):
+def _create_feature_space(tile_data_file, formatted_ids, output_file_path, jobs: int, verbose=False):
     """ Create a pd dataframe with the feature space. First step in the process is to calculate the 2d / 3d metrics on the merged cityjson which outputs a geo df, this is then used to execute the turning function"""
-    n_processors = max(os.cpu_count() - 1, 1)
-    n_processors = 6
+    if not jobs:
+        n_processors = max(os.cpu_count() - 1, 1)
 
     # feature_space_metrics = calculate_metrics(jobs=n_processors, formatted_ids = _formatted_ids, verbose=_verbose)
     feature_space_metrics = calculate_metrics(input=tile_data_file, formatted_ids=formatted_ids, jobs=n_processors, verbose=verbose)
@@ -47,7 +48,8 @@ def _create_feature_space(tile_data_file, formatted_ids, output_file_path, verbo
 
 def _merge_feature_spaces(
         feature_space_folder: str, 
-        output_file: str = "merged_feature_space.csv", 
+        output_file_folder: str,
+        output_file_name: str = "merged_feature_space.csv", 
         exists_ok=False, 
         verbose=False
     ) -> None:
@@ -64,30 +66,32 @@ def _merge_feature_spaces(
         FileExistsError: If the merged file already exists and exists_ok==False.
     """
     # Only csv files and try to avoid files already merged
-    csv_files = [file for file in os.listdir(feature_space_folder) if file.endswith('.csv') and 'merg' not in file]
+    csv_files = [file for file in os.listdir(feature_space_folder) if file.endswith('.csv') and 'merg' not in file and file != output_file_name]
     if not csv_files:
         raise Exception("The feature space folder is empty, please provide a folder with feature space (csv) files")
 
-    output_path = os.path.join(feature_space_folder, output_file)
+    output_file_path = os.path.join(output_file_folder, output_file_name)
 
-    if os.path.exists(output_path) and not exists_ok:
-        raise FileExistsError(f"Output file '{output_path}' already exists. Set `exists_ok=True` to overwrite.")
+    if os.path.exists(output_file_path) and not exists_ok:
+        raise FileExistsError(f"Output file '{output_file_path}' already exists. Set `exists_ok=True` to overwrite.")
     
-    with open(os.path.join(feature_space_folder), 'w') as merged:
-        add_column = True
-        for fs_file in os.listdir(feature_space_folder):
-            with open(os.path.join(feature_space_folder, fs_file), 'r') as fs:
-                for line_num, line in enumerate(fs):
-                    if add_column and line_num == 0:
-                        merged.write(line)
-                        add_column = False
-                    elif line_num == 0:
-                        continue
-                    else:
-                        merged.write(line)
+    for i, fs_file in enumerate(csv_files):
+        if not re.match(r'\d{1,2}-\d{1,4}-\d{1,4}\.csv', fs_file):
+            if verbose:
+                print(f"Skipped file {fs_file}")
+            continue
 
-                    if verbose:
-                        print(f"Added feature space file '{fs_file}'")
+        df = pd.read_csv(os.path.join(feature_space_folder, fs_file))
+
+        df.to_csv(
+                output_file_path,
+                index=False,
+                mode="a",
+                header=(i == 0),  # write header only for the first file
+            )
+
+        if verbose:
+            print(f"Added feature space file '{fs_file}'")
 
     if verbose:
         print(f"Merged feature space files in folder '{feature_space_folder}'")
@@ -95,7 +99,7 @@ def _merge_feature_spaces(
     return
 
 
-def main(tile_data_folder, feature_space_folder, exists_ok=False, verbose=False):
+def main(tile_data_folder, feature_space_folder, jobs, exists_ok=False, verbose=False):
     # Create feature space
     if len(os.listdir(tile_data_folder)) == 0:
         raise Exception("The bag_data_folder is empty, please provide a folder with cityjson files")
@@ -116,6 +120,7 @@ def main(tile_data_folder, feature_space_folder, exists_ok=False, verbose=False)
         feature_space = _create_feature_space(cj_file_path, 
                                               formatted_ids=formatted_ids, 
                                               output_file_path=feature_space_file,
+                                              jobs=jobs,
                                               verbose=verbose)
         if 'geometry' not in feature_space.columns:
             print(f"File: {file}")
@@ -131,4 +136,8 @@ if __name__ == "__main__":
     dotenv.load_dotenv()
     data_folder = os.environ.get('data_folder')
 
-    main(os.path.join(data_folder, "tiles"), os.path.join(data_folder, "feature_spaces"))
+    main(os.path.join(data_folder, "tiles"), os.path.join(data_folder, "feature_spaces"), exists_ok=True, jobs=6)
+    _merge_feature_spaces(os.path.join(data_folder, "feature_spaces"),
+                          data_folder,
+                          "merged_national_fs.csv",
+                          verbose=True)
