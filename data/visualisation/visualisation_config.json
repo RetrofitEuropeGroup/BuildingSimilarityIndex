@@ -1,0 +1,252 @@
+{
+    "actual_volume": {
+        "log_x": true,
+        "log_y": false,
+        "width": 20
+    },
+    "convex_hull_volume": {
+        "log_x": true,
+        "log_y": false,
+        "width": 20
+    },
+    "oorspronkelijkbouwjaar": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "b3_opp_buitenmuur": {
+        "log_x": true,
+        "log_y": false,
+        "width": 0.01
+    },
+    "b3_opp_dak_plat": {
+        "log_x": true,
+        "log_y": false,
+        "width": 0.01
+    },
+    "b3_opp_dak_schuin": {
+        "log_x": true,
+        "log_y": false,
+        "width": 0.01
+    },
+    "b3_opp_grond": {
+        "log_x": true,
+        "log_y": false,
+        "width": 0.01
+    },
+    "b3_opp_scheidingsmuur": {
+        "log_x": true,
+        "log_y": false,
+        "width": 0.01
+    },
+    "b3_bouwlagen": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "b3_hellingshoek_proxy": {
+        "log_x": true,
+        "log_y": false,
+        "width": 0.01
+    },
+    "aantal_verblijfsobjecten": {
+        "log_x": false,
+        "log_y": true,
+        "width": 0.01
+    },
+    "main_roof_parts": {
+        "log_x": true,
+        "log_y": false,
+        "width": 0.01
+    },
+    "main_roof_area": {
+        "log_x": true,
+        "log_y": false,
+        "width": 0.01
+    },
+    "other_roof_parts": {
+        "log_x": true,
+        "log_y": false,
+        "width": 0.01
+    },
+    "other_roof_area": {
+        "log_x": true,
+        "log_y": false,
+        "width": 0.01
+    },
+    "part_ratio": {
+        "log_x": false,
+        "log_y": true,
+        "width": 0.01
+    },
+    "area_ratio": {
+        "log_x": false,
+        "log_y": true,
+        "width": 0.01
+    },
+    "oppervlakte_min": {
+        "log_x": true,
+        "log_y": false,
+        "width": 0.01
+    },
+    "oppervlakte_max": {
+        "log_x": true,
+        "log_y": false,
+        "width": 0.01
+    },
+    "circularity_2d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "hemisphericality_3d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "convexity_2d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "convexity_3d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "fractality_2d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "fractality_3d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "rectangularity_2d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "rectangularity_3d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "squareness_2d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "cubeness_3d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "horizontal_elongation": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "form_factor_3D": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "equivalent_rectangularity_index_2d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "equivalent_prism_index_3d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "proximity_index_2d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "proximity_index_3d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "exchange_index_2d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "spin_index_2d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "spin_index_3d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "perimeter_index_2d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "circumference_index_3d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "depth_index_2d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "depth_index_3d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "girth_index_2d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "girth_index_3d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "dispersion_index_2d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "dispersion_index_3d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "range_index_2d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "range_index_3d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "roughness_index_2d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    },
+    "roughness_index_3d": {
+        "log_x": false,
+        "log_y": false,
+        "width": 0.01
+    }
+}

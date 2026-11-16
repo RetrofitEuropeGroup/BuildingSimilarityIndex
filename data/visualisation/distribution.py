@@ -4,7 +4,8 @@ import sys
 from math import inf
 
 import csv
-import matplotlib as plt
+import json
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from typing import List
@@ -12,25 +13,30 @@ from typing import List
 
 class Distribution:
 
-    def __init__(self):
+    def __init__(self, log_bucket: bool = False):
         self.max = -inf
         self.min = inf
         self.buckets = {}
+        self._log_bucket = log_bucket
         self._integer = False
+        self.average_parts = [[],[]]
 
     def get_extrema(self, df, feature_name):
         self.max = max(self.max, df[feature_name].max())
         self.min = min(self.min, df[feature_name].min())
 
-    def _make_buckets(self, df, feature_name, number_of_buckets: int = 50) -> None:
+    def _make_buckets(self, df, feature_name, number_of_buckets: int = 100) -> None:
         sample = df[feature_name].sample(10)
         if all(int(val) == val for val in sample):
             self._integer = True
+        elif self._log_bucket:
+            self.buckets = {round(bucket, 3): 0 for bucket in np.logspace(np.log10(self.min), np.log10(self.max), number_of_buckets)}
         else:
             self.buckets = {round(bucket, 3): 0 for bucket in np.arange(self.min, self.max, (self.max-self.min)/number_of_buckets)}
 
-    def sort_in_buckets(self, df, feature_name, number_of_buckets: int = 50) -> None:
+    def sort_in_buckets(self, df, feature_name, number_of_buckets: int = 100) -> None:
         clean_df = df.dropna(subset=[feature_name], inplace=False)
+        self._add_to_average_parts(clean_df, feature_name)
         
         if not self.buckets:
             self._make_buckets(clean_df, feature_name, number_of_buckets)
@@ -39,8 +45,6 @@ class Distribution:
             value_counts = clean_df[feature_name].value_counts().to_dict()
             for key in value_counts.keys():
                 self.buckets[key] = self.buckets.get(key, 0) + value_counts[key]
-            # for value in clean_df[feature_name]:
-            #     self.buckets[int(value)] = self.buckets.get(int(value), 0) + 1
         else:
             sorted_buckets = sorted(self.buckets.keys())
             values = clean_df[feature_name].to_numpy()
@@ -50,30 +54,77 @@ class Distribution:
             for key,count in zip(*np.unique(indices, return_counts=True)):
                 self.buckets[sorted_buckets[key]] += count
 
-    def calculate_statistics(self):
-        pass
+    def _add_to_average_parts(self, df, feature_name):
+        self.average_parts[0].append(df.shape[0])
+        self.average_parts[1].append(df.loc[:, feature_name].mean())
+
+    def _calculate_median(self):
+        n = sum(self.buckets.values())
+        targets = [n // 2] if n % 2 else [n // 2 - 1, n // 2]
+        cumulative = 0
+        found = []
+
+        for key, value in sorted(self.buckets.items()):
+            prev_cumulative = cumulative
+            cumulative += value
+            for t in targets:
+                if prev_cumulative <= t < cumulative:
+                    found.append(key)
+            if len(found) == len(targets):
+                break
+
+        return sum(found) / len(found)
+
+    def _calculate_statistics(self):
+        self.average = round(sum([amt * avg for amt, avg in zip(*self.average_parts)]) / sum(self.average_parts[0]), 3)
+
+        self.median = self._calculate_median()
+
+        self.modus = max(self.buckets, key=self.buckets.get)
 
     def return_statistics(self):
+        self._calculate_statistics()
         
-        
-        
-        return (
-            self.distribution,
-            self.max,
-            self.min,
-            self.average,
-            self.median,
-            self.modus
-        ) 
+        return {
+            'buckets': self.buckets,
+            'max': self.max,
+            'min': self.min,
+            'mean': self.average,
+            'median': self.median,
+            'modus': self.modus,
+            'integer': self._integer,
+        }
 
 
 def calculate_distribution(
-    input: str, 
-    columns_to_include: List[str] = None,
-    columns_to_exclude: List[str] = None,
+    input: str,
+    feature_name: str,
+    visual_config: dict = {},
     chunksize = 1000000,
     verbose = False
 ):
+    if verbose:
+        print(f"\nCalculating metric of {feature_name}...")
+
+    distribution = Distribution(log_bucket=visual_config.get('log_x', False))
+
+    with pd.read_csv(input, usecols=[feature_name], chunksize=chunksize) as reader:
+        for chunk in reader:
+            distribution.get_extrema(chunk, feature_name)
+
+    with pd.read_csv(input, usecols=[feature_name], chunksize=chunksize) as reader:
+        for chunk in reader:
+            distribution.sort_in_buckets(chunk, feature_name)
+
+    return distribution.return_statistics()
+
+
+def list_features(
+    input: str, 
+    columns_to_include: List[str] = None,
+    columns_to_exclude: List[str] = None,
+    verbose = False
+):    
     if columns_to_include:
         feature_names = columns_to_include
     else:
@@ -86,40 +137,37 @@ def calculate_distribution(
     if verbose:
         print("Calculating metrics of features: " + ", ".join(feature_names) + "\n")
 
-    for feature_name in feature_names:
-        if verbose:
-            print(f"Calculating metric of {feature_name}...")
-
-        distribution = Distribution()
-
-        with pd.read_csv(input, usecols=[feature_name], chunksize=chunksize) as reader:
-            for chunk in reader:
-                distribution.get_extrema(chunk, feature_name)
-
-        with pd.read_csv(input, usecols=[feature_name], chunksize=chunksize) as reader:
-            for chunk in reader:
-                distribution.sort_in_buckets(chunk, feature_name)
-
-            # print(distribution.buckets)
-            # print(chunk.loc[chunk[feature_name] > max(distribution.buckets.keys()), feature_name])
-
-    return distribution.return_statistics()
+    return feature_names
 
 
 def render_histogram(
     X: List[float],
     height: List[float],
-    output_path: str,
+    output_dir: str,
     feature_name: str,
     # dpi: int = 300,
     # figsize: Tuple[float, float] = (30, 25, "cm")
-    # color, names of axis
+    # color, names of axis,
+    config: dict = {},
     verbose = False
 ):
-    fig, ax = plt.bar()
+    plt.style.use('ggplot')
+    fig, ax = plt.subplots()
+    if config.get('log_x', False):
+        ax.set_xscale('log')
+    if config.get('log_y', False):
+            ax.set_yscale('log')
 
-    plt.savefig()
-    plt.close(fig)
+    if not config.get('integer', True):
+        bin_widths = np.diff(X)
+        bin_widths = np.append(bin_widths, config.get('max', X[-1]+0.8) - X[-1])
+        ax.bar(X, height, width=bin_widths, align='edge')
+    else:
+        ax.bar(X, height)
+
+    output_path = os.path.join(output_dir, f"{feature_name}.png")
+    plt.savefig(output_path)
+    plt.close()
 
     if verbose:
         print(f"Visualisation of feature {feature_name} to: {output_path}")
@@ -166,10 +214,40 @@ def main():
 
     try:
         validate_input(args.input)
-        calculate_distribution(args.input, 
-                               columns_to_include=args.columns_include,
-                               columns_to_exclude=args.columns_exclude,
-                               verbose=args.verbose)
+        with open('./data/visualisation/visualisation_config.json', 'r') as jfile:
+            visual_config = json.load(jfile)
+
+        feature_list = list_features(input=args.input, 
+                                     columns_to_include=args.columns_include,
+                                     columns_to_exclude=args.columns_exclude)
+        for feature in feature_list:
+            results = calculate_distribution(args.input, 
+                                            feature_name=feature,
+                                            visual_config=visual_config.get(feature, {}),
+                                            verbose=args.verbose)
+            
+            if args.verbose:
+                print("\n" + "=" * 15 + f"{feature}" + "=" * 15)
+                print(f"Maximum: {results['max']}")
+                print(f"Minimum: {results['min']}")
+                print(f"Mean:    {results['mean']}")
+                print(f"Median:  {results['median']}")
+                print(f"Modus:   {results['modus']}")
+                # print(f"Buckets: {results['buckets']}")
+
+            labels = sorted(list(results['buckets'].keys()))
+            height = [results['buckets'].get(key) for key in labels]
+
+            vconf = visual_config.get(feature, {}) | results
+
+            render_histogram(
+                X=labels,
+                height=height,
+                output_dir=args.output_folder,
+                feature_name=feature,
+                config=vconf,
+                verbose=args.verbose
+            )
 
         if args.verbose:
             # Print results
