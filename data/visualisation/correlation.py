@@ -31,10 +31,6 @@ def main():
     corr_matrix = df.corr()
     corr_matrix.to_csv('./output/corrm_new.csv')
 
-    # plt.scatter(df['circularity_2d'].values, df['hemisphericality_3d'].values)
-    # plt.savefig('./output/aaaa.png')
-    # plt.close()
-
 
 if __name__ == '__main__':
     main()
