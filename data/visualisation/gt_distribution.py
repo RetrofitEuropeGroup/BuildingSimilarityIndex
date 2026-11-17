@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import sqlite3
+from collections import defaultdict
 from typing import List
 
 
@@ -53,8 +54,9 @@ class Distribution:
             values = clean_df[feature_name].to_numpy()
 
             indices = np.searchsorted(sorted_buckets, values, side='right') - 1
+            valid = indices >= 0
 
-            for key,count in zip(*np.unique(indices, return_counts=True)):
+            for key,count in zip(*np.unique(indices[valid], return_counts=True)):
                 self.buckets[sorted_buckets[key]] += count
 
     def _add_to_average_parts(self, df, feature_name):
@@ -146,6 +148,7 @@ def list_features(
 def render_histogram(
     X: List[float],
     height: List[float],
+    cluster_heights: dict,
     output_dir: str,
     feature_name: str,
     # dpi: int = 300,
@@ -176,54 +179,6 @@ def render_histogram(
         print(f"Visualisation of feature {feature_name} to: {output_path}")
 
 
-def batch_query_bag(cursor_bag, pand_ids: list, columns: list):
-    if not columns or 'identificatie' not in columns:
-        raise Exception("'columns' argument must contain at least one value and 'identificatie'.")
-
-    column_query = ", ".join(columns)
-    panden_query = "(" + ",".join(f"'{pid}'" for pid in pand_ids) + ")"
-    
-    query = f'''SELECT {column_query} 
-                FROM pand 
-                WHERE identificatie IN {panden_query};
-            '''
-    
-    cursor_bag.execute(query)
-    query_result = {}
-    for row in cursor_bag.fetchall():
-        query_result[row[columns.index('identificatie')]] = {columns[i]: row[i] for i in range(len(columns)) if columns[i] != 'identificatie'}
-
-    return query_result
-
-
-def connect_gpkg(file_path: str):
-    """Connect to a Geopackage with SpatiaLite-enabled SQLite3.
-
-    Args:
-        file_path (str): File path to the geopackage
-
-    Returns:
-        Connection: Database (or geopackage) connection
-    """
-    conn = sqlite3.connect(file_path)
-    conn.enable_load_extension(True)
-
-    try:
-        conn.load_extension('mod_spatialite')
-        cursor = conn.cursor()
-        cursor.execute('''SELECT InitSpatialMetadata(1)''')
-        # cursor.execute("SELECT EnableGPKGMode(1)")
-        # cursor.execute('''SELECT CastAutomagic()''') ?
-        cursor.execute('''SELECT EnableGpkgAmphibiousMode();''') # Potentially deprecated
-        cursor.close()
-
-    except sqlite3.Error as e:
-        print(f"SpatiaLite extension warning: {e}")
-        print(f"Continuing will return in geometry being returned as BLOBS")
-
-    return conn
-
-
 def assign_buurtcode(gpkg_path) -> gpd.GeoDataFrame:
     """Loads layer 'buurten' and 'pand' from Geopackage file and adds 'buurtcode' column
     to pand if 'pand' geometry is contained within the 'buurt' geometry
@@ -245,6 +200,39 @@ def assign_buurtcode(gpkg_path) -> gpd.GeoDataFrame:
     panden["buurtcode"] = matched["buurtcode"].to_numpy()
 
     return panden
+
+
+def sort_in_existing_buckets(cluster_values, sorted_buckets):
+    buckets = {bucket: 0 for bucket in sorted_buckets}
+
+    indices = np.searchsorted(sorted_buckets, cluster_values, side='right') - 1
+    valid = indices >= 0
+
+    for key,count in zip(*np.unique(indices[valid], return_counts=True)):
+        buckets[sorted_buckets[key]] += count
+
+    return buckets
+
+
+def collect_values(csv_path, feature_list, clusters, chunksize=1_000_000):
+    id_to_cluster = {int(id_): cl for cl, ids in clusters.items() for id_ in ids} # TODO: using int() to remove leading zeroes just as in feature space
+
+    # global_vals = defaultdict(list)
+    cluster_vals = defaultdict(lambda: defaultdict(list)) # cluster -> feature -> values
+
+    for chunk in pd.read_csv(csv_path, usecols=['id', *feature_list], chunksize=chunksize):
+        chunk["cluster"] = chunk["id"].map(id_to_cluster)
+
+        for feature in feature_list:
+            vals = pd.to_numeric(chunk[feature], errors='coerce')
+            # global_vals[feature].extend(vals.dropna().to_numpy())
+
+            ground_truth = chunk["cluster"].notna()
+            for cl, sub in vals[ground_truth].groupby(chunk.loc[ground_truth, "cluster"]):
+                cluster_vals[cl][feature].extend(sub.dropna().to_numpy())
+
+    # return global_vals, cluster_vals
+    return cluster_vals
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -286,14 +274,14 @@ def main():
         args.columns_include = [column for column in args.columns_include.split(',')]
     if args.columns_exclude:
         args.columns_exclude = [column for column in args.columns_exclude.split(',')]
-    
 
     try:
         pand_df = assign_buurtcode(args.gpkg)
-        
-
-        # Clusters
-
+        clusters = {
+            (cluster, buurtcode): ids for (cluster, buurtcode), ids in pand_df.groupby(["cluster", "buurtcode"])["identificatie"]
+        }
+        # clusters = pand_df.groupby(["cluster", "buurtcode"])["identificatie"].apply(list)
+        # del pand_df
 
         validate_input(args.input)
         with open('./data/visualisation/visualisation_config.json', 'r') as jfile:
@@ -302,6 +290,10 @@ def main():
         feature_list = list_features(input=args.input, 
                                      columns_to_include=args.columns_include,
                                      columns_to_exclude=args.columns_exclude)
+        cluster_values = collect_values(csv_path=args.input, 
+                                        feature_list=feature_list,
+                                        clusters=clusters,
+                                        chunksize=1_000_000)
         for feature in feature_list:
             results = calculate_distribution(args.input, 
                                             feature_name=feature,
@@ -320,11 +312,18 @@ def main():
             labels = sorted(list(results['buckets'].keys()))
             height = [results['buckets'].get(key) for key in labels]
 
+            cheights = {}
+            for cluster, ids in clusters.items():
+                bins = sort_in_existing_buckets(cluster_values[cluster][feature],
+                                                sorted_buckets=labels)
+                cheights[cluster] = bins
+
             vconf = visual_config.get(feature, {}) | results
 
             render_histogram(
                 X=labels,
                 height=height,
+                cluster_heights=cheights,
                 output_dir=args.output_folder,
                 feature_name=feature,
                 config=vconf,
